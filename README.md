@@ -26,6 +26,7 @@ Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encrypt
 - [Examples](#examples)
 - [Construction Details](#construction-details)
 - [Modified Data Structure](#modified-data-structure)
+- [Formal Verification](#formal-verification)
 - [Performance Comparison and Evaluation](#performance-comparison-and-evaluation)
 - [Limitations and Future Work](#limitations-and-future-work)
 - [How to Contribute](#how-to-contribute)
@@ -343,7 +344,7 @@ For the same access policy, `(Family and Trusted) or (Manager and Legal)` and `(
 In our data structure, there is no longer a single root node. Instead, each key pair is associated with the corresponding atom node. The process begins by generating an atom node for each key. Next, we extract the attribute set $`A`$ from the access policy set provided by the user, for each element $`a`$ in $`A`$, an attribute node is created. Finally, depending on the requirements, each atom node is linked with the appropriate nodes according to its specific access policy.
 
 
-## Formal Verification 🔐
+## Formal Verification
 
 For the security and reliability of PD-CP-ABE, we have rigorously modeled and tested the scheme using **formal verification** techniques.
 
@@ -533,6 +534,9 @@ All security properties specified in the `PD_CP_ABE.spthy` file passed verificat
 ### 🔗 Related Artifacts
 
 For further analysis and transparency, detailed proof logs and verification summaries are provided in the [`proofs/`](./Formal_Verification/proofs/) folder. These artifacts can be used to reproduce the results and inspect the internal proof steps.
+
+⚠️ Note: When running the model (without interactive mode), it takes around 20+ minutes to complete on my side, a completed proof file [`Proof_PD_CP_ABE.spthy`](./Formal_Verification/proofs/Proof_PD_CP_ABE.spthy) is available, which can be loaded directly into the GUI.
+
 
 ---
 ## Performance Comparison and Evaluation
