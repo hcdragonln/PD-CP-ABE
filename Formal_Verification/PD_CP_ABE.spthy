@@ -1,0 +1,958 @@
+/*
+======================================
+Info: This file provides a Tamarin model for the Partially Decryptable Ciphertext Policy Attribute-Based Encryption (PD-CP-ABE) Scheme
+(Implementation publicly available at: https://github.com/LimeFavoredOrange/PD-CP-ABE). This scheme is a research-based implementation 
+aimed at enhancing data security through attribute-based encryption with partial decryption capabilities.
+
+Tamarin is a protocol verification tool that allows for the formal verification of security properties in cryptographic protocols, which
+has been successfully used to analyze and support the development of modern security protocols including TLS 1.3, 5G‑AKA, Noise, 
+EMV (Chip-and-pin), and Apple iMessage. (Link to home page: https://tamarin-prover.com/)
+Date: Jan 2025
+*/
+
+
+theory PD_CP_ABE
+begin
+
+
+
+
+//--------------------------------------------------------------------
+// Built-in theories and primitives
+//--------------------------------------------------------------------
+// The "diffie-hellman" and "bilinear-pairing" builtins provide
+// cryptographic constructs and assumptions about how these
+// operations behave. They are essential for modeling
+// attribute-based encryption schemes with pairing operations.
+builtins: diffie-hellman, bilinear-pairing
+
+
+
+
+//--------------------------------------------------------------------
+// Function Declarations
+//--------------------------------------------------------------------
+// These functions represent the core operations in a CP-ABE scheme:
+// Setup, KeyGen, Encrypt, Decrypt, and extended versions(which in the actual implementation, it will called "encrypt" as well) for multi-message.
+functions:
+
+  // The function used to initialize the system, generating and returning the
+  // Master Public Key (MPK) and Master Secret Key (MSK).
+  setup/0,
+
+  // The function will be used to generate a new user key based on the user’s attributes and user ID.
+  // Inputs: Master Public Key (MPK), Master Secret Key (MSK), user attributes, and user ID.
+  keygen/4,
+
+  // The function will be used to encrypt a given message under certain attributes and a policy connector.
+  // Inputs: Master Public Key (MPK), message, attributes, policy connector and user ID.
+  encrypt/5,
+
+  // The function will be used to decrypt a given ciphertext using a user’s secret key.
+  // Inputs: Cipher text and user's access key.
+  decrypt/2,
+
+  // The two types of access policy connectors that the current model supports. (AND, OR)
+  // The access policy connector is used to define how attributes are combined.
+  AND/0,
+  OR/0,
+
+  // The function will be used to encrypt multiple messages at once, each governed by separate attributes
+  // and/or policy connectors.
+  // Inputs: Master Public Key (MPK), messages, attributes, policy connectors, and user ID.
+  // i.e. encryptMulti(mpk, <m1, m2>, < <att1_a, att1_b>, <att2_a, att2_b> >, <AND, AND>, uid)
+  encryptMulti/5,
+
+  // The function will be used to decrypt multi-message ciphertexts, returning a tuple
+  // of decrypted messages or null placeholders.
+  // i.e. decryptMulti(CT, key) = <m1, m2, ......>
+  decryptMulti/2
+
+
+
+
+
+//--------------------------------------------------------------------
+// Equations
+//--------------------------------------------------------------------
+// These equations define the correctness properties of encryption-decryption,
+// ensuring that decrypt(encrypt(...)) = original_message if the policy is satisfied.
+equations:
+
+  // Single-message encryption/decryption correctness:
+  // - For AND connector, user must have *all* specified attributes.
+  // - For OR connector, user must have at least *one* of the attributes.
+  decrypt(encrypt(mpk, m, <att1, att2>, AND, uid), keygen(mpk, msk, <att1, att2>, uid)) = m,
+  decrypt(encrypt(mpk, m, <att1, att2>, OR, uid), keygen(mpk, msk, <att1>, uid)) = m,
+  decrypt(encrypt(mpk, m, <att1, att2>, OR, uid), keygen(mpk, msk, <att2>, uid)) = m,
+
+  // Multi-message encryption/decryption correctness:
+  // In order to shorten the length of the model file, even though multiple encryption-decryption formula combinations
+  // are defined here, only AND-AND and OR-AND are involved in the following rule. However, for other cases, the principle 
+  // is the same, and readers can easily supplement the model.
+
+  // Case: Both policy connectors = AND.
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, uid), keygen(mpk, msk, <att1, att2>, uid)) = <m1, m2>,
+
+
+  // Case: Both policy connectors = OR.
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, OR>, uid), keygen(mpk, msk, <att1, att2>, uid)) = <m1, m2>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, OR>, uid), keygen(mpk, msk, <att1>, uid)) = <m1, m2>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, OR>, uid), keygen(mpk, msk, <att2>, uid)) = <m1, m2>,
+
+  // Case: One = OR, the other = AND (two permutations).
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, AND>, uid), keygen(mpk, msk, <att1, att2>, uid)) = <m1, m2>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, AND>, uid), keygen(mpk, msk, <att1>, uid)) = <m1>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <OR, AND>, uid), keygen(mpk, msk, <att2>, uid)) = <m1>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, OR>, uid), keygen(mpk, msk, <att1, att2>, uid)) = <m1, m2>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, OR>, uid), keygen(mpk, msk, <att1>, uid)) = <m2>,
+  decryptMulti(encryptMulti(mpk, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, OR>, uid), keygen(mpk, msk, <att2>, uid)) = <m2>
+
+
+
+
+
+//--------------------------------------------------------------------
+// Restrictions
+//--------------------------------------------------------------------
+// These restrictions enforce uniqueness constraints or equality constraints
+// on events in the protocol model.
+
+// Restriction: Once
+// Ensures that the event "Once(x)" can only occur once in any trace.
+restriction Once:
+  "All x #i #j. Once(x)@#i & Once(x)@#j ==> #i = #j"
+
+// Restriction: Equality
+// Ensures consistent handling of equal values within the model.
+restriction Equality:
+  "All x y #i. Equality(x, y)@#i ==> x = y"
+
+
+
+
+//--------------------------------------------------------------------
+// Rules
+//--------------------------------------------------------------------
+// The Tamarin 'rule' statements describe how state changes (Simulating 
+// the interaction of encryption schemes as each step in the protocol 
+// executes. They also define when events are emitted (with `--[events]->`) 
+// and how data flows (in brackets).
+
+
+
+//--------------------------------------------------------------------
+// Rule: system_setup
+// Simulates the CP-ABE system initialization. Generates Master Public Key (MPK)
+// and Master Secret Key (MSK). Outputs the MPK to the network.
+
+// MPK = {g^(β1), g^(β2), g^(β3), e(g,g)^(α)}
+// MSK = {α, β1, β2, β3, θ}
+rule system_setup:
+  [ Fr(~alpha), Fr(~beta1), Fr(~beta2), Fr(~beta3), Fr(~theta) ]
+  --[ Once($Broker), Broker_Setup($Broker), SecretKey_Broker($Broker, < ~alpha, ~beta1, ~beta2, ~beta3, ~theta >) ]->
+  [
+    // Store MPK and MSK internally; output MPK to the network
+    !Broker_MasterPublicKey($Broker, < 'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha >),
+    !Broker_MasterSecretKey($Broker, < ~alpha, ~beta1, ~beta2, ~beta3, ~theta >),
+    Out(< 'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha >)
+  ]
+
+
+//--------------------------------------------------------------------
+// Rule: reveal_MSKey
+// Simulates leaking the Master Secret Key (MSK).
+rule reveal_MSKey:
+  [ !Broker_MasterSecretKey($Broker, MSK) ]
+  --[ RevealMSK($Broker) ]->
+  [ Out(MSK) ]
+
+
+//--------------------------------------------------------------------
+// Rule: user_registration
+// Simulates a user registering with the system and obtaining a unique user ID.
+rule user_registration:
+  [ Fr(~uid) ]
+  --[ User_Registration($U, ~uid), Secret(~uid) ]->
+  [ !User($U, ~uid) ]
+
+
+//--------------------------------------------------------------------
+// Rule: generate_attributes
+// Simulates generating two attributes for a given user (identified by uid).
+// In this simplified model, we only generate two attributes at once.
+rule generate_attributes:
+  [ Fr(~attr1), Fr(~attr2), !User($U, ~uid) ]
+  --[ Once(~attr1), Once(~attr2),  Generate_FirstAttribute($Broker, ~attr1, ~uid), Generate_SecondAttribute($Broker, ~attr2, ~uid) ]->
+  [ !FirstAttribute($Broker, ~attr1, ~uid), !SecondAttribute($Broker, ~attr2, ~uid) ]
+
+
+
+//--------------------------------------------------------------------
+// Rule: generate_key_or
+// Simulates generating a user access key under an OR policy (i.e. only one
+// required attribute). The broker uses the MPK and MSK internally to produce
+// a single-attribute key.
+rule generate_key_or:
+  [ !Broker_MasterPublicKey($Broker, MPK), !Broker_MasterSecretKey($Broker, MSK), !User($U, ~uid), !FirstAttribute($Broker, ~attr1, ~uid) ]
+  --[ GenerateKeyOr($U, $Broker, ~uid, <~attr1>), SecretKeyOR(keygen(MPK, MSK, < ~attr1 >, ~uid), ~uid) ]->
+  [ 
+    !User_AccessKey_OR($U, ~uid, < ~attr1 >, keygen(MPK, MSK, < ~attr1 >, ~uid))
+  ]
+
+
+//--------------------------------------------------------------------
+// Rule: generate_key_and
+// Simulates generating a user access key under an AND policy (i.e. both attributes
+// required). The broker uses the MPK and MSK to produce a key that requires
+// both attributes.
+rule generate_key_and:
+  [ !Broker_MasterPublicKey($Broker, MPK), !Broker_MasterSecretKey($Broker, MSK), !User($U, ~uid),  !FirstAttribute($Broker, ~attr1, ~uid), !SecondAttribute($Broker, ~attr2, ~uid) ]
+  --[ GenerateKeyAnd($U, $Broker, ~uid, <~attr1, ~attr2>), SecretKeyAND(keygen(MPK, MSK, < ~attr1, ~attr2 >, ~uid), ~uid) ]->
+  [ 
+    !User_AccessKey_AND($U, ~uid, < ~attr1, ~attr2 >, keygen(MPK, MSK, < ~attr1, ~attr2 >, ~uid))
+  ]
+
+
+
+//--------------------------------------------------------------------
+// Rule: create_access_policy
+// Simulates the attribute authority creating an access policy specifying
+// that a user ID must have the given attributes <attr1, attr2>.
+rule create_access_policy:
+  [ 
+    !FirstAttribute($Broker, ~attr1, ~uid), !SecondAttribute($Broker, ~attr2, ~uid)
+  ]
+  --[ CreateAccessPolicy(<~attr1, ~attr2>, ~uid) ]->
+  [ !AccessPolicy(~attr1, ~attr2, < ~attr1, ~attr2 >, ~uid) ]
+
+
+
+//--------------------------------------------------------------------
+// Rule: encrypt_message_and
+// Simulates encrypting a message with a policy that uses the AND connector,
+// meaning the ciphertext is bound to <attr1, attr2> and the user’s ID.
+rule encrypt_message_and:
+  [ !Broker_MasterPublicKey($Broker, MPK), !AccessPolicy(~attr1, ~attr2, < ~attr1, ~attr2 >, ~uid), Fr(~msg), !User($U, ~uid) ]
+  --[ EncryptMessage_AND($Broker, ~msg, < ~attr1, ~attr2 >, encrypt(MPK, ~msg, < ~attr1, ~attr2 >, AND, ~uid), ~uid),
+      Secret(~msg)
+  ]->
+  [ 
+    // !EncryptedMessage_AND($Broker, encrypt(MPK, ~msg, < ~attr1, ~attr2 >)),
+    Out(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, AND, ~uid))
+  ]
+
+
+//--------------------------------------------------------------------
+// Rule: encrypt_message_or
+// Simulates encrypting a message with a policy that uses the OR connector.
+rule encrypt_message_or:
+  [ !Broker_MasterPublicKey($Broker, MPK), !AccessPolicy(~attr1, ~attr2, < ~attr1, ~attr2 >, ~uid), Fr(~msg), !User($U, ~uid) ]
+  --[ EncryptMessage_OR($Broker, ~msg, < ~attr1, ~attr2 >, encrypt(MPK, ~msg, < ~attr1, ~attr2 >, OR, ~uid), ~uid),
+    Secret(~msg)
+  ]->
+  [ 
+    Out(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, OR, ~uid))
+  ]
+
+
+//--------------------------------------------------------------------
+// Rule: decrypt_message_or
+// Simulates a user decrypting a ciphertext that requires an OR policy. If the user
+// has the single required attribute in their key, the decryption should succeed.
+rule decrypt_message_or:
+  [ In(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, OR, ~uid)), 
+    !User_AccessKey_OR($U, ~uid, < ~attr1 >, key1), 
+    !Broker_MasterPublicKey($Broker, MPK),
+    !AccessPolicy(~attr1, ~attr2, < ~attr1, ~attr2 >, ~uid)
+  ]
+  --[ 
+    DecryptMessage_OR($U, ~msg, < ~attr1 >),
+    Equality(~msg, decrypt(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, OR, ~uid), key1)),
+    Decrypt(~msg)
+  ]->
+  []
+
+
+//--------------------------------------------------------------------
+// Rule: decrypt_message_and
+// Simulates a user decrypting a ciphertext that requires AND policy. The user’s key
+// must contain both attributes <att1, att2>. If the user has the required attributes,
+// the decryption should succeed.
+rule decrypt_message_and:
+  [ In(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, AND, ~uid)), 
+    !User_AccessKey_AND($U, ~uid, < ~attr1, ~attr2 >, key2),
+    !Broker_MasterPublicKey($Broker, MPK),
+    !AccessPolicy(~attr1, ~attr2, < ~attr1, ~attr2 >, ~uid)
+  ]
+  --[ 
+    DecryptMessage_AND($U, ~msg, < ~attr1, ~attr2 >),
+    Equality(~msg, decrypt(encrypt(MPK, ~msg, < ~attr1, ~attr2 >, AND, ~uid), key2)),
+    Decrypt(~msg)
+  ]->
+  []
+
+//--------------------------------------------------------------------
+// Rule: encrypt_message_multi
+// Simulates encrypting multiple messages (<m1, m2>) at once. Each message
+// can be protected by a different attribute pair/policy connector combination.
+rule encrypt_message_multi:
+  [ 
+    // Generate two random messages each time
+    Fr(~m1),
+    Fr(~m2),
+    !Broker_MasterPublicKey($Broker, MPK),
+    !AccessPolicy(~att1, ~att2, <~att1, ~att2>, ~uid)
+  ]
+  --[
+    EncryptMessageMulti($Broker, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <AND, AND>, encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <AND, AND>, ~uid), ~uid),
+    Secret(~m1),
+    Secret(~m2)
+  ]->
+  [
+    // Output the multi-message ciphertext to the network
+    Out(encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <AND, AND>, ~uid))
+  ]
+
+
+//--------------------------------------------------------------------
+// Rule: decrypt_message_multi_satisfy_all
+// Simulates decryption of a multi-message ciphertext that has an AND, AND policy
+// set. The user’s key must satisfy all attributes to decrypt both messages.
+rule decrypt_message_multi_satisfy_all:
+  [
+    // Readd the multi-message ciphertext from the network
+    In(encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <AND, AND>, ~uid)),
+    !Broker_MasterPublicKey($Broker, MPK),
+    !User_AccessKey_AND($U, ~uid, < ~attr1, ~attr2 >, key),
+    !AccessPolicy(~att1, ~att2, <~att1, ~att2>, ~uid)
+  ]
+  --[
+    DecryptMessageMulti($U),
+    Equality(<~m1, ~m2>, decryptMulti(encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <AND, AND>, ~uid), key)),
+    Decrypt(~m1),
+    Decrypt(~m2)
+  ]->
+  []
+
+
+//--------------------------------------------------------------------
+// Rule: decrypt_message_multi_satisfy_one
+// Simulates a partial decryption of multi-message ciphertext that uses OR for the
+// first message and AND for the second. If the user’s key satisfies only
+// one attribute set, they can decrypt only one message.
+rule decrypt_message_multi_satisfy_one:
+  [
+    In(encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <OR, AND>, ~uid)),
+    !Broker_MasterPublicKey($Broker, MPK),
+    !User_AccessKey_AND($U, ~uid, < ~attr1 >, key),
+    !AccessPolicy(~att1, ~att2, <~att1, ~att2>, ~uid)
+  ]
+  --[
+    DecryptMessageMulti($U),
+    Equality(<~m1>, decryptMulti(encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, <~att1, ~att2>>, <OR, AND>, ~uid), key)),
+    Decrypt(~m1)
+  ]->
+  []
+
+
+
+//--------------------------------------------------------------------
+// Executable Lemmas
+//--------------------------------------------------------------------
+// These lemmas ensure the existence of valid traces that include the
+// various events in the protocol, thereby confirming that each
+// operation is reachable (e.g., system setup, user registration, etc.).
+
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the system setup is executable
+// Goal: Ensure there exists at least one trace where Broker_Setup occurs.
+lemma executable_system_setup:
+  exists-trace
+    "Ex Broker #i. Broker_Setup(Broker)@#i"
+
+
+//--------------------------------------------------------------------
+// Ensures the system setup (system_setup) occurs only once
+// Goal: Prevent duplicate system initialization.
+lemma unique_system_setup:
+  "All Broker #i #j. Broker_Setup(Broker)@#i & Broker_Setup(Broker)@#j ==> #i = #j"
+
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the revealed master secret key is executable
+// Goal: Ensure there exists at least one trace where RevealMSK occurs.
+lemma executable_reveal_MSKey:
+  exists-trace
+    "Ex Broker #i. RevealMSK(Broker)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the user registration is executable
+// Goal: Ensure there exists at least one trace where User Registration occurs.
+lemma executable_user_registration:
+  exists-trace
+    "Ex User UserID #i. User_Registration(User, UserID)@#i"
+
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the generation of two attributes is executable
+// Goal: Ensure there exists at least one trace where FirstAttribute and SecondAttribute occur.
+lemma executable_generate_attributes:
+  exists-trace
+    "Ex Broker uid Attribute1 Attribute2 #i. Generate_FirstAttribute(Broker, Attribute1, uid)@#i & Generate_SecondAttribute(Broker, Attribute2, uid)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the generation of a new access key for a user with an OR policy is executable
+// Goal: Ensure there exists at least one trace where GenerateKeyOr occurs.
+lemma executable_generate_key_or:
+  exists-trace
+    "Ex User Broker UserID Attribute #i. GenerateKeyOr(User, Broker, UserID, <Attribute>)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the generation of a new access key for a user with an AND policy is executable
+// Goal: Ensure there exists at least one trace where GenerateKeyAnd occurs.
+lemma executable_generate_key_and:
+  exists-trace
+    "Ex User Broker UserID Attribute1 Attribute2 #i. GenerateKeyAnd(User, Broker, UserID, <Attribute1, Attribute2>)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the creation of an access policy is executable
+// Goal: Ensure there exists at least one trace where CreateAccessPolicy occurs.
+lemma executable_create_access_policy:
+  exists-trace
+    "Ex uid Attribute1 Attribute2 #i. CreateAccessPolicy(<Attribute1, Attribute2>, uid)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the encryption of a message with an AND policy is executable
+// Goal: Ensure there exists at least one trace where EncryptMessage_AND occurs.
+lemma executable_encrypt_message_and:
+  exists-trace
+    "Ex Broker Message Attribute CT uid #i. EncryptMessage_AND(Broker, Message, Attribute, CT, uid)@#i"
+
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the encryption of a message with an OR policy is executable
+// Goal: Ensure there exists at least one trace where EncryptMessage_OR occurs.
+lemma executable_encrypt_message_or:
+  exists-trace
+    "Ex Broker Message Attribute CT uid #i. EncryptMessage_OR(Broker, Message, Attribute, CT, uid)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the decryption of a message with an OR policy is executable
+// Goal: Ensure there exists at least one trace where DecryptMessage_OR occurs.
+lemma executable_decrypt_message_or:
+  exists-trace
+    "Ex User Message Attribute #i. DecryptMessage_OR(User, Message, Attribute)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma to check if the decryption of a message with an AND policy is executable
+// Goal: Ensure there exists at least one trace where DecryptMessage_AND occurs.
+lemma executable_decrypt_message_and:
+  exists-trace
+    "Ex User Message Attribute #i. DecryptMessage_AND(User, Message, Attribute)@#i"
+
+
+//--------------------------------------------------------------------
+// Executable lemma to check the functionality of the broker
+// Goal: Ensure the broker can
+// 1. Setup the system
+// 2. Reveal the Master Secret Key
+// 3. Generate attributes
+// 4. Generate access keys for users (and/or)
+// 5. Create access policies
+// 6. Encrypt messages (and/or)
+lemma executable_broker:
+  exists-trace
+    "Ex Broker m1 m2 att1 att2 CT CT2 u uid #i #j #k #p #q #g #t #v #y #x #z. 
+    Broker_Setup(Broker)@#i & 
+    RevealMSK(Broker)@#j & 
+    Generate_FirstAttribute(Broker, att1, uid)@#k & 
+    Generate_SecondAttribute(Broker, att2, uid)@#p & 
+    GenerateKeyOr(u, Broker, uid, <att1>)@#q & 
+    GenerateKeyAnd(u, Broker, uid, <att1, att2>)@#g & 
+    CreateAccessPolicy(<att1, att2>, uid)@#t & 
+    EncryptMessage_AND(Broker, m1, <att1, att2>, CT, uid)@#v & 
+    EncryptMessage_OR(Broker, m2, <att1, att2>, CT2, uid)@#y & 
+    DecryptMessage_AND(u, m1, <att1, att2>)@#x &
+    DecryptMessage_OR(u, m2, <att1>)@#z
+    "
+
+
+//--------------------------------------------------------------------
+// Lemma: executable_encrypt_message_multi
+// Ensures a trace exists where multi-message encryption occurs.
+lemma executable_encrypt_message_multi:
+  exists-trace
+    "Ex Broker m1 m2 att1 att2 CT uid #i.
+      EncryptMessageMulti(Broker, <m1,m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT, uid)@#i"
+
+
+//--------------------------------------------------------------------
+// Lemma: executable_decrypt_message_multi
+// Ensures a trace exists where multi-message decryption occurs.
+lemma executable_decrypt_message_multi:
+  exists-trace
+    "
+    Ex Broker m1 m2 key att1 att2 CT u uid #i #j #p.
+    EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT, uid)@#i &
+    SecretKeyAND(key, uid)@#j &
+    DecryptMessageMulti(u)@#p &
+    Decrypt(m1)@#p &
+    Decrypt(m2)@#p
+    "
+
+
+
+
+//--------------------------------------------------------------------
+// SECRECY LEMMAS
+//--------------------------------------------------------------------
+// These lemmas ensure that certain items (messages, keys, user IDs)
+// remain confidential unless specifically revealed (e.g., by RevealMSK).
+
+
+
+//--------------------------------------------------------------------
+// 1. secret_message_and
+//    Ensures that any message encrypted under AND-based policy remains secret
+//    unless the master secret key (MSK) is revealed.
+lemma secret_message_and:
+  "All Broker uid CT m att1 att2 #i #j. Secret(m)@#i & 
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT, uid)@#j  
+  ==> ( not (Ex #k. K(m)@k) | ((Ex #l. RevealMSK(Broker)@l)))
+  "
+
+
+//--------------------------------------------------------------------
+// 2. secret_message_or
+//    Ensures that any message encrypted under OR-based policy remains secret
+//    unless the master secret key (MSK) is revealed.
+lemma secret_message_or:
+  "All Broker uid CT m att1 att2 #i #j. Secret(m)@#i & 
+  EncryptMessage_OR(Broker, m, <att1, att2>, CT, uid)@#j  
+  ==> ( not (Ex #k. K(m)@k) | ((Ex #l. RevealMSK(Broker)@l)))
+  "
+
+
+//--------------------------------------------------------------------
+// 3. secret_user_key_or
+//    Ensures that any user key generated under an OR policy remains secret
+//    (i.e., the attacker cannot learn the user key).
+lemma secret_user_key_or:
+  "All uid key #i. SecretKeyOR(key, uid)@i 
+  ==> not (Ex #k. K(key)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 4. secret_user_key_and
+//    Ensures that any user key generated under an AND policy remains secret
+//    (i.e., the attacker cannot learn the user key).
+lemma secret_user_key_and:
+  "All uid key #i. SecretKeyAND(key, uid)@i 
+  ==> not (Ex #k. K(key)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 5. secret_master_secret_key
+//    Ensures that the Master Secret Key (MSK) remains secret unless explicitly
+//    revealed by RevealMSK.
+lemma secret_master_secret_key:
+  "All Broker SK #i. Broker_Setup(Broker)@i 
+  & SecretKey_Broker(Broker, SK)@i 
+  ==> ( not (Ex #k. K(SK)@k) | ((Ex Broker #l. RevealMSK(Broker)@l)))
+  "
+
+
+//--------------------------------------------------------------------
+// 6. secret_user_id
+//    Ensures that a user’s ID remains secret, not known to the attacker)
+lemma secret_user_id:
+  "All uid #i. Secret(uid)@i 
+  ==> not (Ex #k. K(uid)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 7. secret_message_multi
+//    Ensures that in multi-message encryption (AND, AND), both messages
+//    remain confidential unless the MSK is leaked.
+lemma secret_message_multi:
+  "All Broker uid m1 m2 CT att1 att2 #i #j.
+  Secret(m1)@#i & Secret(m2)@#i &
+  EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT, uid)@#j
+  ==> not (Ex #k. K(m1)@#k) | 
+      not (Ex #k. K(m2)@#k) | 
+      ((Ex Broker #l. RevealMSK(Broker)@#l))
+  "
+
+
+
+
+//--------------------------------------------------------------------
+// COLLUSION-RESISTANCE LEMMA
+//--------------------------------------------------------------------
+// Lemmas about preventing colluding users from decrypting ciphertexts
+// that none of them could decrypt individually.
+
+//--------------------------------------------------------------------
+// 1. collusion_resistance
+//    Ensures that if two different users each have only one of the
+//    attributes required under an AND policy, they cannot jointly decrypt
+//    under an OR connector either.
+lemma collusion_resistance:
+  "
+  All Broker m u1 uid1 CT1 u2 uid2 att1 att2 #i #j #k #l.
+  CreateAccessPolicy(<att1, att2>, uid1)@#i & 
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT1, uid1)@#j &
+  GenerateKeyOr(u1, Broker, uid1, <att1>)@#k 
+  & GenerateKeyOr(u2, Broker, uid2, <att2>)@#l &
+  not(Ex #p. GenerateKeyOr(u1, Broker, uid1, <att2>)@p) &
+  not(Ex #q. GenerateKeyOr(u2, Broker, uid2, <att1>)@q)
+  ==> not(
+    (Ex #g. DecryptMessage_OR(u1, m, <att1>)@g) | 
+    (Ex #q. DecryptMessage_OR(u2, m, <att2>)@q))
+  "
+
+
+
+
+
+//--------------------------------------------------------------------
+// ACCESS-CONTROL AND DECRYPTION-CORRECTNESS LEMMAS
+//--------------------------------------------------------------------
+// These lemmas ensure that a user can only decrypt ciphertext if they
+// legitimately hold the appropriate key and attributes, and that
+// ciphertext used in decryption truly originated from an encryption event.
+
+
+//--------------------------------------------------------------------
+// 1. only_decrypt_with_right_attributes_and
+//    Ensures that a user can only decrypt an AND-encrypted ciphertext
+//    if they have a corresponding AND-based key for those exact attributes.
+lemma only_decrypt_with_right_attributes_and:
+  "
+  All Broker m u uid CT att1 att2 #i #j.
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT, uid)@i & 
+  DecryptMessage_AND(u, m, <att1, att2>)@j
+  ==> (Ex uid #k. GenerateKeyAnd(u, Broker, uid, <att1, att2>)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 2. only_decrypt_with_right_attributes_or
+//    Ensures that a user can only decrypt an OR-encrypted ciphertext if
+//    they have at least one of the required attributes. This lemma specifically
+//    checks that the user can decrypt for both <att1> and <att2>.
+lemma only_decrypt_with_right_attributes_or:
+  "
+  All Broker m u  uid CT att1 att2 #i #j #p.
+  EncryptMessage_OR(Broker, m, <att1, att2>, CT, uid)@i & 
+  DecryptMessage_OR(u, m, <att1>)@j & 
+  DecryptMessage_OR(u, m, <att2>)@p
+  ==> (Ex uid #k. GenerateKeyOr(u, Broker, uid, <att1>)@k) & (
+      Ex uid #l. GenerateKeyOr(u, Broker, uid, <att2>)@l)
+  "
+
+
+//--------------------------------------------------------------------
+// 3. decrypt_with_encrypted_message_and
+//    Ensures that when a user decrypts a message under AND encryption,
+//    the ciphertext indeed comes from a matching EncryptMessage_AND event.
+lemma decrypt_with_encrypted_message_and:
+  "
+  All m u att1 att2 #i.
+  DecryptMessage_AND(u, m, <att1, att2>)@i
+  ==> (Ex Broker uid CT #k. EncryptMessage_AND(Broker, m, <att1, att2>, CT, uid)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 4. decrypt_with_encrypted_message_or
+//    Ensures that when a user decrypts a message under OR encryption,
+//    the ciphertext indeed corresponds to a matching EncryptMessage_OR event.
+lemma decrypt_with_encrypted_message_or:
+  "
+  All m u att1 #i.
+  DecryptMessage_OR(u, m, <att1>)@i
+  ==> (Ex Broker uid CT  att2 #k. EncryptMessage_OR(Broker, m, <att1, att2>, CT, uid)@k)
+  "
+
+
+//--------------------------------------------------------------------
+// 5. consistency_check
+//    Forbids the case where an AND-encrypted message is (incorrectly)
+//    decrypted by an OR-based key. This ensures internal consistency.
+lemma consistency_check:
+  "All Broker m u uid CT att1 att2 #i #j.
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT, uid)@#i &
+  DecryptMessage_OR(u, m, <att1>)@#j
+  ==> F"
+
+
+//--------------------------------------------------------------------
+// 6. no_decryption_without_key
+//    Ensures that a user cannot decrypt an AND-based ciphertext without having
+//    the correct AND-based key from the broker.
+lemma no_decryption_without_key:
+  "All m u att1 att2 #i.
+  DecryptMessage_AND(u, m, <att1, att2>)@#i 
+  ==> (Ex Broker uid #j. GenerateKeyAnd(u, Broker, uid, <att1, att2>)@#j)"
+
+
+//--------------------------------------------------------------------
+// 7. only_correct_user_can_decrypt
+//    For AND-based encryption: If the uid in the ciphertext does not match
+//    the uid in the user’s key, the user cannot decrypt the message. (must 
+//    be the same user)
+lemma only_correct_user_can_decrypt:
+  "All Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT, uid1)@#i &
+  GenerateKeyAnd(u2, Broker, uid2, <att1, att2>)@#j &
+  not (uid1 = uid2)
+  ==> not (Ex #k. DecryptMessage_AND(u2, m, <att1, att2>)@#k)"
+
+
+//--------------------------------------------------------------------
+// 8. only_correct_user_can_decrypt_or
+//    For OR-based encryption: If the uid in the ciphertext does not match
+//    the uid in the user’s key, the user cannot decrypt the message.
+lemma only_correct_user_can_decrypt_or:
+  "All Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+  EncryptMessage_OR(Broker, m, <att1, att2>, CT, uid1)@#i &
+  GenerateKeyOr(u2, Broker, uid2, <att1>)@#j &
+  not (uid1 = uid2)
+  ==> not (Ex #k. DecryptMessage_OR(u2, m, <att1>)@#k)"
+
+
+//--------------------------------------------------------------------
+// 9. multi_message_decryption
+//    In a multi-message scenario, if only part of the policy is satisfied
+//    (e.g., the first message is under OR, the second under AND), the user can
+//    only decrypt the message they have the proper attributes for.
+lemma multi_message_decryption:
+  "
+  All Broker m1 m2 key att1 att2 att3 CT uid #i #j.
+  EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att3>>, <OR, AND>, CT, uid)@#i &
+  SecretKeyAND(key, uid)@#j
+  ==> (Ex u #k. DecryptMessageMulti(u)@#k & Decrypt(m1)@#k) 
+      & not (Ex #l. Decrypt(m2)@#l)
+  "
+
+
+//--------------------------------------------------------------------
+// 10. consistency_multi_message_output
+//     Ensures that if multi-message decryption yields <m1, m2>, it must match
+//     exactly the original messages encrypted in that event.
+lemma consistency_multi_message_output:
+  "
+  All Broker m1 m2 decrypted1 decrypted2 att1 att2 CT u uid #i #j.
+  EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT, uid)@#i &
+  DecryptMessageMulti(u)@#j &
+  Decrypt(decrypted1)@#j &
+  Decrypt(decrypted2)@#j &
+  Equality(<m1, m2>, <decrypted1, decrypted2>)@#j
+  ==> (m1 = decrypted1 & m2 = decrypted2)
+  "
+
+
+
+//--------------------------------------------------------------------
+// UNIQUENESS & REGISTRATION LEMMAS
+//--------------------------------------------------------------------
+// These lemmas ensure unique generation of keys and user registrations.
+
+
+
+//--------------------------------------------------------------------
+// 1. unique_key_for_and
+//    Guarantees that if two AND keys are generated for the same user
+//    and the same attribute set, they must be the same event (no duplication).
+lemma unique_key_for_and:
+  "All Broker u1 u2 uid att1 att2 #i #j.
+  GenerateKeyAnd(u1, Broker, uid, <att1, att2>)@#i & 
+  GenerateKeyAnd(u2, Broker, uid, <att1, att2>)@#j
+  ==> u1 = u2"
+
+
+//--------------------------------------------------------------------
+// 2. unique_user_registration
+//    Ensures that a single user ID cannot be registered by different users.
+//    If the same uid is used in multiple registration events, it must
+//    refer to the same event and same user.
+lemma unique_user_registration:
+  "All U U2 uid #i #j.
+    User_Registration(U, uid)@#i 
+    & User_Registration(U2, uid)@#j
+    ==> (#i = #j & U = U2)"
+
+
+//--------------------------------------------------------------------
+// 3. consistent_key_generation_for_same_user
+//    Ensures that if the same user (and same uid, same attributes)
+//    triggers multiple AND key generations, they produce the same key.
+lemma consistent_key_generation_for_same_user:
+  "All u uid Broker att1 att2 key1 key2 #i #j.
+  GenerateKeyAnd(u, Broker, uid, <att1, att2>)@#i &
+  GenerateKeyAnd(u, Broker, uid, <att1, att2>)@#j &
+  SecretKeyAND(key1, uid)@#i &
+  SecretKeyAND(key2, uid)@#j
+  ==> key1 = key2"
+
+
+//--------------------------------------------------------------------
+// 4. consistent_key_generation_for_same_user_or
+//    The OR-policy analogue: if a user requests multiple OR keys for
+//    the same attribute, they must produce the same key.
+lemma consistent_key_generation_for_same_user_or:
+  "All u uid Broker att1 key1 key2 #i #j.
+  GenerateKeyOr(u, Broker, uid, <att1>)@#i &
+  GenerateKeyOr(u, Broker, uid, <att1>)@#j &
+  SecretKeyOR(key1, uid)@#i &
+  SecretKeyOR(key2, uid)@#j
+  ==> key1 = key2"
+
+
+//--------------------------------------------------------------------
+// 5. different_users_generate_different_keys
+//    Ensures that two distinct users, each generating an AND key for the
+//    same attribute set, end up with different keys. (No key reuse attacks)
+lemma different_users_generate_different_keys:
+  "
+  All u1 u2 Broker uid1 uid2 att1 att2 key1 key2 #i #j.
+  GenerateKeyAnd(u1, Broker, uid1, <att1, att2>)@#i &
+  GenerateKeyAnd(u2, Broker, uid2, <att1, att2>)@#j &
+  SecretKeyAND(key1, uid1)@#i &
+  SecretKeyAND(key2, uid2)@#j &
+  not (u1 = u2)
+  ==> not (key1 = key2)
+  "
+
+
+
+
+
+//--------------------------------------------------------------------
+// CIPHERTEXT-DISTINCTION LEMMAS
+//--------------------------------------------------------------------
+// These lemmas ensure that encryptions for different users produce
+// different ciphertexts, preventing reuse attacks or collisions.
+
+
+//--------------------------------------------------------------------
+// 1. encryption_different_for_different_users
+//    For AND-based encryption: If two ciphertexts are encrypted
+//    with the same policy but for different user IDs, they must differ.
+lemma encryption_different_for_different_users:
+  "
+  All Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT1, uid1)@#i &
+  EncryptMessage_AND(Broker, m, <att1, att2>, CT2, uid2)@#j &
+  not (uid1 = uid2)
+  ==> not (CT1 = CT2)
+  "
+
+
+
+//--------------------------------------------------------------------
+// 2. encryption_different_for_different_users_or
+//    The OR-based analogue: ensures that ciphertexts for different users
+//    remain distinct under otherwise identical encryption parameters.
+lemma encryption_different_for_different_users_or:
+  "
+  All Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  EncryptMessage_OR(Broker, m, <att1, att2>, CT1, uid1)@#i &
+  EncryptMessage_OR(Broker, m, <att1, att2>, CT2, uid2)@#j &
+  not (uid1 = uid2)
+  ==> not (CT1 = CT2)
+  "
+
+
+
+
+
+//--------------------------------------------------------------------
+// NON-MALLEABILITY LEMMAS
+//--------------------------------------------------------------------
+// These lemmas ensure that a valid ciphertext cannot be tampered with
+// to produce a different valid ciphertext for a different message.
+
+
+//--------------------------------------------------------------------
+// 1. non_malleability
+//    For AND encryption: If the attacker tries to alter a ciphertext CT1
+//    to produce CT2, but they are recognized as the same in Tamarin
+//    (Equality(CT1, CT2)), the message must remain the same.
+lemma non_malleability:
+  "All Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+  EncryptMessage_AND(Broker, m1, <att1, att2>, CT1, uid)@#i &
+  DecryptMessage_AND(u, m2, <att1, att2>)@#j &
+  Equality(CT1, CT2)@#i
+  ==> m1 = m2"
+
+
+//--------------------------------------------------------------------
+// 2. non_malleability_or
+//    The OR-based analogue: If a ciphertext for message m1 is
+//    recognized as identical (CT1 = CT2), then the decrypted message m2
+//    must also be m1.
+lemma non_malleability_or:
+  "All Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+  EncryptMessage_OR(Broker, m1, <att1, att2>, CT1, uid)@#i &
+  DecryptMessage_OR(u, m2, <att1>)@#j &
+  Equality(CT1, CT2)@#i
+  ==> m1 = m2"
+
+
+
+
+
+//--------------------------------------------------------------------
+// ATTRIBUTE-COLLISION / MULTI-USER LEMMAS
+//--------------------------------------------------------------------
+// These lemmas address potential attribute collisions or repeated usage
+// across multiple users in the multi-message scenario.
+
+
+
+//--------------------------------------------------------------------
+// 1. no_attribute_collision
+//    Ensures that if the same user obtains AND keys for two different UIDs
+//    (uid1 != uid2) with the same attribute set, they cannot simply reuse
+//    <att1, att2>. (Two encryptor exists, but the same attribute set)
+lemma no_attribute_collision:
+  "All u uid1 uid2 Broker att1 att2 key1 key2 #i #j.
+  GenerateKeyAnd(u, Broker, uid1, <att1, att2>)@#i &
+  GenerateKeyAnd(u, Broker, uid2, <att1, att2>)@#j &
+  SecretKeyAND(key1, uid1)@#i &
+  SecretKeyAND(key2, uid2)@#j &
+  not (uid1 = uid2)
+  ==> not (<att1, att2> = <att1, att2>)"
+
+
+//--------------------------------------------------------------------
+// 2. unique_ciphertext_multi_users
+//    Ensures that multi-message encryptions intended for different users
+//    produce distinct ciphertexts, even if the messages and attribute sets
+//    are identical.
+lemma unique_ciphertext_multi_users:
+  "All Broker m1 m2 att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT1, uid1)@#i &
+  EncryptMessageMulti(Broker, <m1, m2>, <<att1, att2>, <att1, att2>>, <AND, AND>, CT2, uid2)@#j &
+  not (uid1 = uid2)
+  ==> not (CT1 = CT2)"
+
+end

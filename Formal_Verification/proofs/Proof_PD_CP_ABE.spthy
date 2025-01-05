@@ -1,0 +1,3474 @@
+theory PD_CP_ABE begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman, bilinear-pairing
+functions: AND/0, OR/0, decrypt/2, decryptMulti/2, encrypt/5,
+           encryptMulti/5, fst/1, keygen/4, pair/2, setup/0, snd/1
+equations:
+    decrypt(encrypt(mpk, m, <att1, att2>, AND, uid),
+            keygen(mpk, msk, <att1, att2>, uid))
+  = m,
+    decrypt(encrypt(mpk, m, <att1, att2>, OR, uid),
+            keygen(mpk, msk, att1, uid))
+  = m,
+    decrypt(encrypt(mpk, m, <att1, att2>, OR, uid),
+            keygen(mpk, msk, att2, uid))
+  = m,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <AND, AND>, uid),
+                 keygen(mpk, msk, <att1, att2>, uid))
+  = <m1, m2>,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <AND, OR>, uid),
+                 keygen(mpk, msk, att1, uid))
+  = m2,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <AND, OR>, uid),
+                 keygen(mpk, msk, att2, uid))
+  = m2,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <AND, OR>, uid),
+                 keygen(mpk, msk, <att1, att2>, uid))
+  = <m1, m2>,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, AND>, uid),
+                 keygen(mpk, msk, att1, uid))
+  = m1,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, AND>, uid),
+                 keygen(mpk, msk, att2, uid))
+  = m1,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, AND>, uid),
+                 keygen(mpk, msk, <att1, att2>, uid))
+  = <m1, m2>,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, OR>, uid),
+                 keygen(mpk, msk, att1, uid))
+  = <m1, m2>,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, OR>, uid),
+                 keygen(mpk, msk, att2, uid))
+  = <m1, m2>,
+    decryptMulti(encryptMulti(mpk, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <OR, OR>, uid),
+                 keygen(mpk, msk, <att1, att2>, uid))
+  = <m1, m2>,
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2
+
+
+
+
+
+
+
+
+
+restriction Once:
+  "∀ x #i #j. ((Once( x ) @ #i) ∧ (Once( x ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Equality:
+  "∀ x y #i. (Equality( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+rule (modulo E) system_setup:
+   [
+   Fr( ~alpha ), Fr( ~beta1 ), Fr( ~beta2 ), Fr( ~beta3 ),
+   Fr( ~theta )
+   ]
+  --[
+  Once( $Broker ), Broker_Setup( $Broker ),
+  SecretKey_Broker( $Broker, <~alpha, ~beta1, ~beta2, ~beta3, ~theta>
+  )
+  ]->
+   [
+   !Broker_MasterPublicKey( $Broker,
+                            <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+   ),
+   !Broker_MasterSecretKey( $Broker,
+                            <~alpha, ~beta1, ~beta2, ~beta3, ~theta>
+   ),
+   Out( <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) reveal_MSKey:
+   [ !Broker_MasterSecretKey( $Broker, MSK ) ]
+  --[ RevealMSK( $Broker ) ]->
+   [ Out( MSK ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) user_registration:
+   [ Fr( ~uid ) ]
+  --[ User_Registration( $U, ~uid ), Secret( ~uid ) ]->
+   [ !User( $U, ~uid ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) generate_attributes:
+   [ Fr( ~attr1 ), Fr( ~attr2 ), !User( $U, ~uid ) ]
+  --[
+  Once( ~attr1 ), Once( ~attr2 ),
+  Generate_FirstAttribute( $Broker, ~attr1, ~uid ),
+  Generate_SecondAttribute( $Broker, ~attr2, ~uid )
+  ]->
+   [
+   !FirstAttribute( $Broker, ~attr1, ~uid ),
+   !SecondAttribute( $Broker, ~attr2, ~uid )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) generate_key_or:
+   [
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !Broker_MasterSecretKey( $Broker, MSK ), !User( $U, ~uid ),
+   !FirstAttribute( $Broker, ~attr1, ~uid )
+   ]
+  --[
+  GenerateKeyOr( $U, $Broker, ~uid, ~attr1 ),
+  SecretKeyOR( keygen(MPK, MSK, ~attr1, ~uid), ~uid )
+  ]->
+   [
+   !User_AccessKey_OR( $U, ~uid, ~attr1,
+                       keygen(MPK, MSK, ~attr1, ~uid)
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) generate_key_and:
+   [
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !Broker_MasterSecretKey( $Broker, MSK ), !User( $U, ~uid ),
+   !FirstAttribute( $Broker, ~attr1, ~uid ),
+   !SecondAttribute( $Broker, ~attr2, ~uid )
+   ]
+  --[
+  GenerateKeyAnd( $U, $Broker, ~uid, <~attr1, ~attr2> ),
+  SecretKeyAND( keygen(MPK, MSK, <~attr1, ~attr2>, ~uid), ~uid )
+  ]->
+   [
+   !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>,
+                        keygen(MPK, MSK, <~attr1, ~attr2>, ~uid)
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) create_access_policy:
+   [
+   !FirstAttribute( $Broker, ~attr1, ~uid ),
+   !SecondAttribute( $Broker, ~attr2, ~uid )
+   ]
+  --[ CreateAccessPolicy( <~attr1, ~attr2>, ~uid ) ]->
+   [ !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) encrypt_message_and:
+   [
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid ),
+   Fr( ~msg ), !User( $U, ~uid )
+   ]
+  --[
+  EncryptMessage_AND( $Broker, ~msg, <~attr1, ~attr2>,
+                      encrypt(MPK, ~msg, <~attr1, ~attr2>, AND, ~uid), ~uid
+  ),
+  Secret( ~msg )
+  ]->
+   [ Out( encrypt(MPK, ~msg, <~attr1, ~attr2>, AND, ~uid) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) encrypt_message_or:
+   [
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid ),
+   Fr( ~msg ), !User( $U, ~uid )
+   ]
+  --[
+  EncryptMessage_OR( $Broker, ~msg, <~attr1, ~attr2>,
+                     encrypt(MPK, ~msg, <~attr1, ~attr2>, OR, ~uid), ~uid
+  ),
+  Secret( ~msg )
+  ]->
+   [ Out( encrypt(MPK, ~msg, <~attr1, ~attr2>, OR, ~uid) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) decrypt_message_or:
+   [
+   In( encrypt(MPK, ~msg, <~attr1, ~attr2>, OR, ~uid) ),
+   !User_AccessKey_OR( $U, ~uid, ~attr1, key1 ),
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid )
+   ]
+  --[
+  DecryptMessage_OR( $U, ~msg, ~attr1 ),
+  Equality( ~msg,
+            decrypt(encrypt(MPK, ~msg, <~attr1, ~attr2>, OR, ~uid), key1)
+  ),
+  Decrypt( ~msg )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) decrypt_message_or:
+     [
+     In( encrypt(MPK, ~msg, <~attr1, ~attr2>, OR, ~uid) ),
+     !User_AccessKey_OR( $U, ~uid, ~attr1, key1 ),
+     !Broker_MasterPublicKey( $Broker, MPK ),
+     !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid )
+     ]
+    --[
+    DecryptMessage_OR( $U, ~msg, ~attr1 ), Equality( ~msg, z ),
+    Decrypt( ~msg )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. ~attr1
+             = ~attr1.10
+       ~attr2
+             = ~attr2.10
+       ~msg  = ~msg.10
+       ~uid  = ~uid.10
+       MPK   = MPK.10
+       key1  = key1.10
+       z     = decrypt(encrypt(MPK.10, ~msg.10, <~attr1.10, ~attr2.10>,
+                               OR, ~uid.10),
+                       key1.10)
+    
+    2. ~attr1
+             = ~x.10
+       ~msg  = ~msg.16
+       ~uid  = ~x.13
+       MPK   = x.14
+       key1  = keygen(x.14, x.15, ~x.10, ~x.13)
+       z     = ~msg.16
+    
+    3. ~attr2
+             = ~x.10
+       ~msg  = ~msg.15
+       ~uid  = ~x.12
+       MPK   = x.13
+       key1  = keygen(x.13, x.14, ~x.10, ~x.12)
+       z     = ~msg.15
+  */
+
+rule (modulo E) decrypt_message_and:
+   [
+   In( encrypt(MPK, ~msg, <~attr1, ~attr2>, AND, ~uid) ),
+   !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>, key2 ),
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid )
+   ]
+  --[
+  DecryptMessage_AND( $U, ~msg, <~attr1, ~attr2> ),
+  Equality( ~msg,
+            decrypt(encrypt(MPK, ~msg, <~attr1, ~attr2>, AND, ~uid), key2)
+  ),
+  Decrypt( ~msg )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) decrypt_message_and:
+     [
+     In( encrypt(MPK, ~msg, <~attr1, ~attr2>, AND, ~uid) ),
+     !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>, key2 ),
+     !Broker_MasterPublicKey( $Broker, MPK ),
+     !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid )
+     ]
+    --[
+    DecryptMessage_AND( $U, ~msg, <~attr1, ~attr2> ),
+    Equality( ~msg, z ), Decrypt( ~msg )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. ~attr1
+             = ~attr1.10
+       ~attr2
+             = ~attr2.10
+       ~msg  = ~msg.10
+       ~uid  = ~uid.10
+       MPK   = MPK.10
+       key2  = key2.10
+       z     = decrypt(encrypt(MPK.10, ~msg.10, <~attr1.10, ~attr2.10>,
+                               AND, ~uid.10),
+                       key2.10)
+    
+    2. ~attr1
+             = ~x.10
+       ~attr2
+             = ~x.11
+       ~msg  = ~msg.16
+       ~uid  = ~x.13
+       MPK   = x.14
+       key2  = keygen(x.14, x.15, <~x.10, ~x.11>, ~x.13)
+       z     = ~msg.16
+  */
+
+rule (modulo E) encrypt_message_multi:
+   [
+   Fr( ~m1 ), Fr( ~m2 ), !Broker_MasterPublicKey( $Broker, MPK ),
+   !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid )
+   ]
+  --[
+  EncryptMessageMulti( $Broker, <~m1, ~m2>,
+                       <<~att1, ~att2>, ~att1, ~att2>, <AND, AND>,
+                       encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                                    <AND, AND>, ~uid),
+                       ~uid
+  ),
+  Secret( ~m1 ), Secret( ~m2 )
+  ]->
+   [
+   Out( encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                     <AND, AND>, ~uid)
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) decrypt_message_multi_satisfy_all:
+   [
+   In( encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                    <AND, AND>, ~uid)
+   ),
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>, key ),
+   !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid )
+   ]
+  --[
+  DecryptMessageMulti( $U ),
+  Equality( <~m1, ~m2>,
+            decryptMulti(encryptMulti(MPK, <~m1, ~m2>,
+                                      <<~att1, ~att2>, ~att1, ~att2>, <AND, AND>, ~uid),
+                         key)
+  ),
+  Decrypt( ~m1 ), Decrypt( ~m2 )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) decrypt_message_multi_satisfy_all:
+     [
+     In( encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                      <AND, AND>, ~uid)
+     ),
+     !Broker_MasterPublicKey( $Broker, MPK ),
+     !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>, key ),
+     !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid )
+     ]
+    --[
+    DecryptMessageMulti( $U ), Equality( <~m1, ~m2>, z ),
+    Decrypt( ~m1 ), Decrypt( ~m2 )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. ~att1 = ~att1.13
+       ~att2 = ~att2.13
+       ~m1   = ~m1.13
+       ~m2   = ~m2.13
+       ~uid  = ~uid.13
+       MPK   = MPK.13
+       key   = key.13
+       z     = decryptMulti(encryptMulti(MPK.13, <~m1.13, ~m2.13>,
+                                         <<~att1.13, ~att2.13>, ~att1.13, ~att2.13>, <AND, AND>,
+                                         ~uid.13),
+                            key.13)
+    
+    2. ~att1 = ~x.13
+       ~att2 = ~x.14
+       ~m1   = ~m1.22
+       ~m2   = ~m2.22
+       ~uid  = ~x.19
+       MPK   = x.20
+       key   = keygen(x.20, x.21, <~x.13, ~x.14>, ~x.19)
+       z     = <~m1.22, ~m2.22>
+  */
+
+rule (modulo E) decrypt_message_multi_satisfy_one:
+   [
+   In( encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                    <OR, AND>, ~uid)
+   ),
+   !Broker_MasterPublicKey( $Broker, MPK ),
+   !User_AccessKey_AND( $U, ~uid, ~attr1, key ),
+   !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid )
+   ]
+  --[
+  DecryptMessageMulti( $U ),
+  Equality( ~m1,
+            decryptMulti(encryptMulti(MPK, <~m1, ~m2>,
+                                      <<~att1, ~att2>, ~att1, ~att2>, <OR, AND>, ~uid),
+                         key)
+  ),
+  Decrypt( ~m1 )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) decrypt_message_multi_satisfy_one:
+     [
+     In( encryptMulti(MPK, <~m1, ~m2>, <<~att1, ~att2>, ~att1, ~att2>,
+                      <OR, AND>, ~uid)
+     ),
+     !Broker_MasterPublicKey( $Broker, MPK ),
+     !User_AccessKey_AND( $U, ~uid, ~attr1, key ),
+     !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid )
+     ]
+    --[ DecryptMessageMulti( $U ), Equality( ~m1, z ), Decrypt( ~m1 )
+    ]->
+     [ ]
+    variants (modulo AC)
+    1. ~att1 = ~att1.12
+       ~att2 = ~att2.12
+       ~m1   = ~m1.12
+       ~m2   = ~m2.12
+       ~uid  = ~uid.12
+       MPK   = MPK.12
+       key   = key.12
+       z     = decryptMulti(encryptMulti(MPK.12, <~m1.12, ~m2.12>,
+                                         <<~att1.12, ~att2.12>, ~att1.12, ~att2.12>, <OR, AND>,
+                                         ~uid.12),
+                            key.12)
+    
+    2. ~att1 = ~x.12
+       ~att2 = ~x.13
+       ~m1   = ~m1.20
+       ~m2   = ~m2.20
+       ~uid  = ~x.17
+       MPK   = x.18
+       key   = keygen(x.18, x.19, <~x.12, ~x.13>, ~x.17)
+       z     = <~m1.20, ~m2.20>
+    
+    3. ~att1 = ~x.12
+       ~m1   = ~m1.20
+       ~uid  = ~x.17
+       MPK   = x.18
+       key   = keygen(x.18, x.19, ~x.12, ~x.17)
+       z     = ~m1.20
+    
+    4. ~att2 = ~x.12
+       ~m1   = ~m1.19
+       ~uid  = ~x.16
+       MPK   = x.17
+       key   = keygen(x.17, x.18, ~x.12, ~x.16)
+       z     = ~m1.19
+  */
+
+lemma executable_system_setup:
+  exists-trace "∃ Broker #i. Broker_Setup( Broker ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker #i. (Broker_Setup( Broker ) @ #i)"
+*/
+simplify
+SOLVED // trace found
+
+lemma unique_system_setup:
+  all-traces
+  "∀ Broker #i #j.
+    ((Broker_Setup( Broker ) @ #i) ∧ (Broker_Setup( Broker ) @ #j)) ⇒
+    (#i = #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker #i #j.
+  (Broker_Setup( Broker ) @ #i) ∧ (Broker_Setup( Broker ) @ #j)
+ ∧
+  ¬(#i = #j)"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma executable_reveal_MSKey:
+  exists-trace "∃ Broker #i. RevealMSK( Broker ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker #i. (RevealMSK( Broker ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₀ #i )
+  case system_setup
+  SOLVED // trace found
+qed
+
+lemma executable_user_registration:
+  exists-trace
+  "∃ User UserID #i. User_Registration( User, UserID ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ User UserID #i. (User_Registration( User, UserID ) @ #i)"
+*/
+simplify
+SOLVED // trace found
+
+lemma executable_generate_attributes:
+  exists-trace
+  "∃ Broker uid Attribute1 Attribute2 #i.
+    (Generate_FirstAttribute( Broker, Attribute1, uid ) @ #i) ∧
+    (Generate_SecondAttribute( Broker, Attribute2, uid ) @ #i)"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker uid Attribute1 Attribute2 #i.
+  (Generate_FirstAttribute( Broker, Attribute1, uid ) @ #i) ∧
+  (Generate_SecondAttribute( Broker, Attribute2, uid ) @ #i)"
+*/
+simplify
+solve( !User( $U, ~uid ) ▶₂ #i )
+  case user_registration
+  SOLVED // trace found
+qed
+
+lemma executable_generate_key_or:
+  exists-trace
+  "∃ User Broker UserID Attribute #i.
+    GenerateKeyOr( User, Broker, UserID, Attribute ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ User Broker UserID Attribute #i.
+  (GenerateKeyOr( User, Broker, UserID, Attribute ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
+
+lemma executable_generate_key_and:
+  exists-trace
+  "∃ User Broker UserID Attribute1 Attribute2 #i.
+    GenerateKeyAnd( User, Broker, UserID, <Attribute1, Attribute2>
+    ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ User Broker UserID Attribute1 Attribute2 #i.
+  (GenerateKeyAnd( User, Broker, UserID, <Attribute1, Attribute2>
+   ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          SOLVED // trace found
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma executable_create_access_policy:
+  exists-trace
+  "∃ uid Attribute1 Attribute2 #i.
+    CreateAccessPolicy( <Attribute1, Attribute2>, uid ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ uid Attribute1 Attribute2 #i.
+  (CreateAccessPolicy( <Attribute1, Attribute2>, uid ) @ #i)"
+*/
+simplify
+solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₀ #i )
+  case generate_attributes
+  solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₁ #i )
+    case generate_attributes
+    SOLVED // trace found
+  qed
+qed
+
+lemma executable_encrypt_message_and:
+  exists-trace
+  "∃ Broker Message Attribute CT uid #i.
+    EncryptMessage_AND( Broker, Message, Attribute, CT, uid ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker Message Attribute CT uid #i.
+  (EncryptMessage_AND( Broker, Message, Attribute, CT, uid ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma executable_encrypt_message_or:
+  exists-trace
+  "∃ Broker Message Attribute CT uid #i.
+    EncryptMessage_OR( Broker, Message, Attribute, CT, uid ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker Message Attribute CT uid #i.
+  (EncryptMessage_OR( Broker, Message, Attribute, CT, uid ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      SOLVED // trace found
+    qed
+  qed
+qed
+
+lemma executable_decrypt_message_or:
+  exists-trace
+  "∃ User Message Attribute #i.
+    DecryptMessage_OR( User, Message, Attribute ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ User Message Attribute #i.
+  (DecryptMessage_OR( User, Message, Attribute ) @ #i)"
+*/
+simplify
+solve( !User_AccessKey_OR( $U, ~uid, ~attr1,
+                           keygen(MPK, x, ~x.1, ~uid)
+       ) ▶₁ #i )
+  case generate_key_or
+  solve( !Broker_MasterPublicKey( $Broker,
+                                  <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+         ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                           em('g', 'g')^~alpha>,
+                          ~msg, <~attr1, ~attr2>, OR, ~uid)
+             ) @ #vk )
+        case encrypt_message_or
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
+
+lemma executable_decrypt_message_and:
+  exists-trace
+  "∃ User Message Attribute #i.
+    DecryptMessage_AND( User, Message, Attribute ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ User Message Attribute #i.
+  (DecryptMessage_AND( User, Message, Attribute ) @ #i)"
+*/
+simplify
+solve( !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>,
+                            keygen(MPK, x, <~attr1, ~attr2>, ~uid)
+       ) ▶₁ #i )
+  case generate_key_and
+  solve( !Broker_MasterPublicKey( $Broker,
+                                  <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+         ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                           em('g', 'g')^~alpha>,
+                          ~msg, <~attr1, ~attr2>, AND, ~uid)
+             ) @ #vk )
+        case encrypt_message_and
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
+
+lemma executable_broker:
+  exists-trace
+  "∃ Broker m1 m2 att1 att2 CT CT2 u uid #i #j #k #p #q #g #t #v #y
+     #x #z.
+    ((((((((((Broker_Setup( Broker ) @ #i) ∧
+             (RevealMSK( Broker ) @ #j)) ∧
+            (Generate_FirstAttribute( Broker, att1, uid ) @ #k)) ∧
+           (Generate_SecondAttribute( Broker, att2, uid ) @ #p)) ∧
+          (GenerateKeyOr( u, Broker, uid, att1 ) @ #q)) ∧
+         (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #g)) ∧
+        (CreateAccessPolicy( <att1, att2>, uid ) @ #t)) ∧
+       (EncryptMessage_AND( Broker, m1, <att1, att2>, CT, uid ) @ #v)) ∧
+      (EncryptMessage_OR( Broker, m2, <att1, att2>, CT2, uid ) @ #y)) ∧
+     (DecryptMessage_AND( u, m1, <att1, att2> ) @ #x)) ∧
+    (DecryptMessage_OR( u, m2, att1 ) @ #z)"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker m1 m2 att1 att2 CT CT2 u uid #i #j #k #p #q #g #t #v #y
+   #x #z.
+  (Broker_Setup( Broker ) @ #i) ∧
+  (RevealMSK( Broker ) @ #j) ∧
+  (Generate_FirstAttribute( Broker, att1, uid ) @ #k) ∧
+  (Generate_SecondAttribute( Broker, att2, uid ) @ #p) ∧
+  (GenerateKeyOr( u, Broker, uid, att1 ) @ #q) ∧
+  (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #g) ∧
+  (CreateAccessPolicy( <att1, att2>, uid ) @ #t) ∧
+  (EncryptMessage_AND( Broker, m1, <att1, att2>, CT, uid ) @ #v) ∧
+  (EncryptMessage_OR( Broker, m2, <att1, att2>, CT2, uid ) @ #y) ∧
+  (DecryptMessage_AND( u, m1, <att1, att2> ) @ #x) ∧
+  (DecryptMessage_OR( u, m2, att1 ) @ #z)"
+*/
+simplify
+solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₀ #j )
+  case system_setup
+  solve( !User( $U.1, ~uid ) ▶₂ #k )
+    case user_registration
+    solve( !User( $U.2, ~uid ) ▶₂ #p )
+      case user_registration
+      solve( !Broker_MasterPublicKey( $Broker, MPK.1 ) ▶₀ #q )
+        case system_setup
+        solve( !Broker_MasterSecretKey( $Broker, MSK.1 ) ▶₁ #q )
+          case system_setup
+          solve( !User( $U, ~uid ) ▶₂ #q )
+            case user_registration
+            solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #q )
+              case generate_attributes
+              solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #g )
+                case system_setup
+                solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #g )
+                  case system_setup
+                  solve( !User( $U, ~uid ) ▶₂ #g )
+                    case user_registration
+                    solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #g )
+                      case generate_attributes
+                      solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #g )
+                        case generate_attributes
+                        solve( !FirstAttribute( $Broker.1, ~attr1, ~uid ) ▶₀ #t )
+                          case generate_attributes
+                          solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₁ #t )
+                            case generate_attributes
+                            solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #v )
+                              case system_setup
+                              solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+                                     ) ▶₁ #v )
+                                case create_access_policy
+                                solve( !User( $U.1, ~uid ) ▶₃ #v )
+                                  case user_registration
+                                  solve( !Broker_MasterPublicKey( $Broker, MPK.1 ) ▶₀ #y )
+                                    case system_setup
+                                    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+                                           ) ▶₁ #y )
+                                      case create_access_policy
+                                      solve( !User( $U.1, ~uid ) ▶₃ #y )
+                                        case user_registration
+                                        solve( !User_AccessKey_AND( $U, ~uid.1, <~attr1, ~attr2>,
+                                                                    keygen(MPK, x.1,
+                                                                           <~attr1, ~attr2>, ~uid.1)
+                                               ) ▶₁ #x )
+                                          case generate_key_and
+                                          solve( !Broker_MasterPublicKey( $Broker.1,
+                                                                          <'g'^~beta1, 'g'^~beta2, 
+                                                                           'g'^~beta3, 
+                                                                           em('g', 'g')^~alpha>
+                                                 ) ▶₂ #x )
+                                            case system_setup
+                                            solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>,
+                                                                  ~uid
+                                                   ) ▶₃ #x )
+                                              case create_access_policy
+                                              solve( !User_AccessKey_OR( $U, ~uid.1, ~attr1,
+                                                                         keygen(MPK, x.1, ~x.2,
+                                                                                ~uid.1)
+                                                     ) ▶₁ #z )
+                                                case generate_key_or
+                                                solve( !Broker_MasterPublicKey( $Broker.1,
+                                                                                <'g'^~beta1, 
+                                                                                 'g'^~beta2, 
+                                                                                 'g'^~beta3, 
+                                                                                 em('g', 'g')^~alpha
+                                                                                >
+                                                       ) ▶₂ #z )
+                                                  case system_setup
+                                                  solve( !AccessPolicy( ~attr1, ~attr2.2,
+                                                                        <~attr1, ~attr2.2>, ~uid
+                                                         ) ▶₃ #z )
+                                                    case create_access_policy
+                                                    solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 
+                                                                         'g'^~beta3, 
+                                                                         em('g', 'g')^~alpha>,
+                                                                        ~msg.1, <~attr1, ~attr2.2>,
+                                                                        OR, ~uid)
+                                                           ) @ #vk.1 )
+                                                      case encrypt_message_or
+                                                      solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 
+                                                                           'g'^~beta3, 
+                                                                           em('g', 'g')^~alpha>,
+                                                                          ~msg, <~attr1, ~attr2>,
+                                                                          AND, ~uid)
+                                                             ) @ #vk.1 )
+                                                        case encrypt_message_and
+                                                        SOLVED // trace found
+                                                      qed
+                                                    qed
+                                                  qed
+                                                qed
+                                              qed
+                                            qed
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma executable_encrypt_message_multi:
+  exists-trace
+  "∃ Broker m1 m2 att1 att2 CT uid #i.
+    EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                         <AND, AND>, CT, uid
+    ) @ #i"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker m1 m2 att1 att2 CT uid #i.
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT, uid
+   ) @ #i)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₂ #i )
+  case system_setup
+  solve( !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid ) ▶₃ #i )
+    case create_access_policy
+    SOLVED // trace found
+  qed
+qed
+
+lemma executable_decrypt_message_multi:
+  exists-trace
+  "∃ Broker m1 m2 key att1 att2 CT u uid #i #j #p.
+    ((((EncryptMessageMulti( Broker, <m1, m2>,
+                             <<att1, att2>, att1, att2>, <AND, AND>, CT, uid
+        ) @ #i) ∧
+       (SecretKeyAND( key, uid ) @ #j)) ∧
+      (DecryptMessageMulti( u ) @ #p)) ∧
+     (Decrypt( m1 ) @ #p)) ∧
+    (Decrypt( m2 ) @ #p)"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ Broker m1 m2 key att1 att2 CT u uid #i #j #p.
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT, uid
+   ) @ #i) ∧
+  (SecretKeyAND( key, uid ) @ #j) ∧
+  (DecryptMessageMulti( u ) @ #p) ∧
+  (Decrypt( m1 ) @ #p) ∧
+  (Decrypt( m2 ) @ #p)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₂ #i )
+  case system_setup
+  solve( !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid ) ▶₃ #i )
+    case create_access_policy
+    solve( !Broker_MasterPublicKey( $Broker.1, MPK ) ▶₀ #j )
+      case system_setup
+      solve( !Broker_MasterSecretKey( $Broker.1, MSK ) ▶₁ #j )
+        case system_setup
+        solve( !User( $U, ~uid ) ▶₂ #j )
+          case user_registration
+          solve( !FirstAttribute( $Broker.1, ~attr1, ~uid ) ▶₃ #j )
+            case generate_attributes
+            solve( !SecondAttribute( $Broker.1, ~attr2, ~uid ) ▶₄ #j )
+              case generate_attributes
+              solve( DecryptMessageMulti( u ) @ #p )
+                case decrypt_message_multi_satisfy_all
+                solve( !Broker_MasterPublicKey( $Broker.2, MPK ) ▶₁ #p )
+                  case system_setup
+                  solve( !User_AccessKey_AND( $U.1, ~uid.1, <~attr1.1, ~attr2.1>,
+                                              keygen(<'g'^~beta1.2, 'g'^~beta2.2, 'g'^~beta3.2, 
+                                                      em('g', 'g')^~alpha.2>,
+                                                     x, <~att1.1, ~att2.1>, ~uid.1)
+                         ) ▶₂ #p )
+                    case generate_key_and
+                    solve( !AccessPolicy( ~att1.1, ~att2.1, <~att1.1, ~att2.1>, ~uid.1
+                           ) ▶₃ #p )
+                      case create_access_policy
+                      solve( Decrypt( ~m1 ) @ #p )
+                        case decrypt_message_multi_satisfy_all_case_1
+                        solve( Decrypt( ~m2 ) @ #p )
+                          case decrypt_message_multi_satisfy_all
+                          solve( !KU( encryptMulti(<'g'^~beta1.2, 'g'^~beta2.2, 
+                                                    'g'^~beta3.2, em('g', 'g')^~alpha.2>,
+                                                   <~m1, ~m2>,
+                                                   <<~att1.1, ~att2.1>, ~att1.1, ~att2.1>,
+                                                   <AND, AND>, ~uid.1)
+                                 ) @ #vk )
+                            case encrypt_message_multi
+                            SOLVED // trace found
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secret_message_and:
+  all-traces
+  "∀ Broker uid CT m att1 att2 #i #j.
+    ((Secret( m ) @ #i) ∧
+     (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #j)) ⇒
+    ((¬(∃ #k. K( m ) @ #k)) ∨ (∃ #l. RevealMSK( Broker ) @ #l))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker uid CT m att1 att2 #i #j.
+  (Secret( m ) @ #i) ∧
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #j)
+ ∧
+  (∃ #k. (K( m ) @ #k)) ∧ (∀ #l. (RevealMSK( Broker ) @ #l) ⇒ ⊥)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #j )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #j )
+      case user_registration
+      solve( Secret( ~msg ) @ #i )
+        case encrypt_message_and
+        solve( !KU( ~msg ) @ #vk )
+          case encrypt_message_and
+          by solve( !KU( ~uid ) @ #vk.5 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secret_message_or:
+  all-traces
+  "∀ Broker uid CT m att1 att2 #i #j.
+    ((Secret( m ) @ #i) ∧
+     (EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #j)) ⇒
+    ((¬(∃ #k. K( m ) @ #k)) ∨ (∃ #l. RevealMSK( Broker ) @ #l))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker uid CT m att1 att2 #i #j.
+  (Secret( m ) @ #i) ∧
+  (EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #j)
+ ∧
+  (∃ #k. (K( m ) @ #k)) ∧ (∀ #l. (RevealMSK( Broker ) @ #l) ⇒ ⊥)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #j )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #j )
+      case user_registration
+      solve( Secret( ~msg ) @ #i )
+        case encrypt_message_or
+        solve( !KU( ~msg ) @ #vk )
+          case encrypt_message_or_case_1
+          by solve( !KU( ~attr1 ) @ #vk.4 )
+        next
+          case encrypt_message_or_case_2
+          by solve( !KU( ~attr2 ) @ #vk.4 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secret_user_key_or:
+  all-traces
+  "∀ uid key #i.
+    (SecretKeyOR( key, uid ) @ #i) ⇒ (¬(∃ #k. K( key ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ uid key #i.
+  (SecretKeyOR( key, uid ) @ #i) ∧ ∃ #k. (K( key ) @ #k)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !KU( keygen(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                            em('g', 'g')^~alpha>,
+                           <~alpha, ~beta1, ~beta2, ~beta3, ~theta>, ~attr1, ~uid)
+               ) @ #vk )
+          case c_keygen
+          by solve( !KU( ~attr1 ) @ #vk.3 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secret_user_key_and:
+  all-traces
+  "∀ uid key #i.
+    (SecretKeyAND( key, uid ) @ #i) ⇒ (¬(∃ #k. K( key ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ uid key #i.
+  (SecretKeyAND( key, uid ) @ #i) ∧ ∃ #k. (K( key ) @ #k)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          solve( !KU( keygen(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                              em('g', 'g')^~alpha>,
+                             <~alpha, ~beta1, ~beta2, ~beta3, ~theta>, <~attr1, ~attr2>, ~uid)
+                 ) @ #vk )
+            case c_keygen
+            by solve( !KU( ~uid ) @ #vk.4 )
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma secret_master_secret_key:
+  all-traces
+  "∀ Broker SK #i.
+    ((Broker_Setup( Broker ) @ #i) ∧
+     (SecretKey_Broker( Broker, SK ) @ #i)) ⇒
+    ((¬(∃ #k. K( SK ) @ #k)) ∨
+     (∃ Broker.1 #l. RevealMSK( Broker.1 ) @ #l))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker SK #i.
+  (Broker_Setup( Broker ) @ #i) ∧
+  (SecretKey_Broker( Broker, SK ) @ #i)
+ ∧
+  (∃ #k. (K( SK ) @ #k)) ∧
+  (∀ Broker.1 #l. (RevealMSK( Broker.1 ) @ #l) ⇒ ⊥)"
+*/
+simplify
+solve( !KU( ~alpha ) @ #vk.1 )
+  case reveal_MSKey_case_1
+  by contradiction /* from formulas */
+next
+  case reveal_MSKey_case_2
+  by contradiction /* from formulas */
+next
+  case reveal_MSKey_case_3
+  by contradiction /* from formulas */
+qed
+
+lemma secret_user_id:
+  all-traces
+  "∀ uid #i. (Secret( uid ) @ #i) ⇒ (¬(∃ #k. K( uid ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ uid #i. (Secret( uid ) @ #i) ∧ ∃ #k. (K( uid ) @ #k)"
+*/
+simplify
+solve( Secret( uid ) @ #i )
+  case encrypt_message_and
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₁ #i )
+      case create_access_policy
+      solve( !User( $U, ~uid ) ▶₃ #i )
+        case user_registration
+        solve( !KU( ~msg ) @ #vk )
+          case encrypt_message_and
+          by solve( !KU( ~uid ) @ #vk.5 )
+        qed
+      qed
+    qed
+  qed
+next
+  case encrypt_message_multi_case_1
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( ~m1 ) @ #vk )
+        case encrypt_message_multi_case_1
+        by solve( !KU( ~uid ) @ #vk.15 )
+      next
+        case encrypt_message_multi_case_2
+        by solve( !KU( ~uid ) @ #vk.15 )
+      next
+        case encrypt_message_multi_case_3
+        by solve( !KU( ~uid ) @ #vk.5 )
+      qed
+    qed
+  qed
+next
+  case encrypt_message_multi_case_2
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( ~m2 ) @ #vk )
+        case encrypt_message_multi_case_1
+        by solve( !KU( ~uid ) @ #vk.15 )
+      next
+        case encrypt_message_multi_case_2
+        by solve( !KU( ~uid ) @ #vk.15 )
+      next
+        case encrypt_message_multi_case_3
+        by solve( !KU( ~uid ) @ #vk.5 )
+      qed
+    qed
+  qed
+next
+  case encrypt_message_or
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₁ #i )
+      case create_access_policy
+      solve( !User( $U, ~uid ) ▶₃ #i )
+        case user_registration
+        solve( !KU( ~msg ) @ #vk )
+          case encrypt_message_or_case_1
+          by solve( !KU( ~attr1 ) @ #vk.4 )
+        next
+          case encrypt_message_or_case_2
+          by solve( !KU( ~attr2 ) @ #vk.4 )
+        qed
+      qed
+    qed
+  qed
+next
+  case user_registration
+  by solve( !KU( ~uid ) @ #vk )
+qed
+
+lemma secret_message_multi:
+  all-traces
+  "∀ Broker uid m1 m2 CT att1 att2 #i #j.
+    (((Secret( m1 ) @ #i) ∧ (Secret( m2 ) @ #i)) ∧
+     (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                           <AND, AND>, CT, uid
+      ) @ #j)) ⇒
+    (((¬(∃ #k. K( m1 ) @ #k)) ∨ (¬(∃ #k. K( m2 ) @ #k))) ∨
+     (∃ Broker.1 #l. RevealMSK( Broker.1 ) @ #l))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker uid m1 m2 CT att1 att2 #i #j.
+  (Secret( m1 ) @ #i) ∧
+  (Secret( m2 ) @ #i) ∧
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT, uid
+   ) @ #j)
+ ∧
+  (∃ #k. (K( m1 ) @ #k)) ∧
+  (∃ #k. (K( m2 ) @ #k)) ∧
+  (∀ Broker.1 #l. (RevealMSK( Broker.1 ) @ #l) ⇒ ⊥)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₂ #j )
+  case system_setup
+  solve( !AccessPolicy( ~att1, ~att2, <~att1, ~att2>, ~uid ) ▶₃ #j )
+    case create_access_policy
+    solve( Secret( ~m1 ) @ #i )
+      case encrypt_message_multi
+      solve( Secret( ~m2 ) @ #i )
+        case encrypt_message_multi
+        solve( !KU( ~m1 ) @ #vk )
+          case encrypt_message_multi_case_1
+          by solve( !KU( ~uid ) @ #vk.16 )
+        next
+          case encrypt_message_multi_case_2
+          by solve( !KU( ~uid ) @ #vk.16 )
+        next
+          case encrypt_message_multi_case_3
+          by solve( !KU( ~uid ) @ #vk.6 )
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma collusion_resistance:
+  all-traces
+  "∀ Broker m u1 uid1 CT1 u2 uid2 att1 att2 #i #j #k #l.
+    ((((((CreateAccessPolicy( <att1, att2>, uid1 ) @ #i) ∧
+         (EncryptMessage_AND( Broker, m, <att1, att2>, CT1, uid1 ) @ #j)) ∧
+        (GenerateKeyOr( u1, Broker, uid1, att1 ) @ #k)) ∧
+       (GenerateKeyOr( u2, Broker, uid2, att2 ) @ #l)) ∧
+      (¬(∃ #p. GenerateKeyOr( u1, Broker, uid1, att2 ) @ #p))) ∧
+     (¬(∃ #q. GenerateKeyOr( u2, Broker, uid2, att1 ) @ #q))) ⇒
+    (¬((∃ #g. DecryptMessage_OR( u1, m, att1 ) @ #g) ∨
+       (∃ #q. DecryptMessage_OR( u2, m, att2 ) @ #q)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u1 uid1 CT1 u2 uid2 att1 att2 #i #j #k #l.
+  (CreateAccessPolicy( <att1, att2>, uid1 ) @ #i) ∧
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT1, uid1 ) @ #j) ∧
+  (GenerateKeyOr( u1, Broker, uid1, att1 ) @ #k) ∧
+  (GenerateKeyOr( u2, Broker, uid2, att2 ) @ #l)
+ ∧
+  (∀ #p. (GenerateKeyOr( u1, Broker, uid1, att2 ) @ #p) ⇒ ⊥) ∧
+  (∀ #q. (GenerateKeyOr( u2, Broker, uid2, att1 ) @ #q) ⇒ ⊥) ∧
+  (((∃ #g. (DecryptMessage_OR( u1, m, att1 ) @ #g)) ∨
+    (∃ #q. (DecryptMessage_OR( u2, m, att2 ) @ #q))))"
+*/
+simplify
+solve( (∃ #g. (DecryptMessage_OR( $U.1, ~msg, ~attr1 ) @ #g))  ∥
+       (∃ #q. (DecryptMessage_OR( $U.2, ~msg, ~attr2 ) @ #q)) )
+  case case_1
+  solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₀ #i )
+    case generate_attributes
+    solve( !SecondAttribute( $Broker.1, ~attr2.1, ~uid.1 ) ▶₁ #i )
+      case generate_attributes
+      solve( !Broker_MasterPublicKey( $Broker.2, MPK.1 ) ▶₀ #j )
+        case system_setup
+        solve( !AccessPolicy( ~attr1, ~attr2.1, <~attr1, ~attr2.1>, ~uid.1
+               ) ▶₁ #j )
+          case create_access_policy
+          solve( !User( $U.1, ~uid.1 ) ▶₃ #j )
+            case user_registration
+            solve( !Broker_MasterPublicKey( $Broker.2, MPK.1 ) ▶₀ #k )
+              case system_setup
+              solve( !Broker_MasterSecretKey( $Broker.2, MSK ) ▶₁ #k )
+                case system_setup
+                solve( !User( $U, ~uid.1 ) ▶₂ #k )
+                  case user_registration
+                  solve( !FirstAttribute( $Broker.2, ~attr1, ~uid.1 ) ▶₃ #k )
+                    case generate_attributes
+                    solve( !Broker_MasterPublicKey( $Broker.1, MPK.1 ) ▶₀ #l )
+                      case system_setup
+                      solve( !Broker_MasterSecretKey( $Broker.1, MSK ) ▶₁ #l )
+                        case system_setup
+                        solve( !User( $U.1, ~uid.2 ) ▶₂ #l )
+                          case user_registration
+                          by solve( !FirstAttribute( $Broker.1, ~attr2.1, ~uid.2 ) ▶₃ #l )
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case case_2
+  solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₀ #i )
+    case generate_attributes
+    solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₁ #i )
+      case generate_attributes
+      solve( !Broker_MasterPublicKey( $Broker.1, MPK ) ▶₀ #j )
+        case system_setup
+        solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+               ) ▶₁ #j )
+          case create_access_policy
+          solve( !User( $U, ~uid ) ▶₃ #j )
+            case user_registration
+            solve( !Broker_MasterPublicKey( $Broker.1, MPK ) ▶₀ #k )
+              case system_setup
+              solve( !Broker_MasterSecretKey( $Broker.1, MSK ) ▶₁ #k )
+                case system_setup
+                solve( !User( $U.1, ~uid ) ▶₂ #k )
+                  case user_registration
+                  solve( !FirstAttribute( $Broker.1, ~attr1, ~uid ) ▶₃ #k )
+                    case generate_attributes
+                    solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #l )
+                      case system_setup
+                      solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #l )
+                        case system_setup
+                        solve( !User( $U.1, ~uid.1 ) ▶₂ #l )
+                          case user_registration
+                          by solve( !FirstAttribute( $Broker, ~attr2, ~uid.1 ) ▶₃ #l )
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma only_decrypt_with_right_attributes_and:
+  all-traces
+  "∀ Broker m u uid CT att1 att2 #i #j.
+    ((EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+     (DecryptMessage_AND( u, m, <att1, att2> ) @ #j)) ⇒
+    (∃ uid.1 #k.
+      GenerateKeyAnd( u, Broker, uid.1, <att1, att2> ) @ #k)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u uid CT att1 att2 #i #j.
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+  (DecryptMessage_AND( u, m, <att1, att2> ) @ #j)
+ ∧
+  ∀ uid.1 #k.
+   (GenerateKeyAnd( u, Broker, uid.1, <att1, att2> ) @ #k) ⇒ ⊥"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !User_AccessKey_AND( $U.1, ~uid.1, <~attr1, ~attr2>,
+                                  keygen(MPK, x, <~attr1, ~attr2>, ~uid.1)
+             ) ▶₁ #j )
+        case generate_key_and
+        solve( !Broker_MasterPublicKey( $Broker.1,
+                                        <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                         em('g', 'g')^~alpha.1>
+               ) ▶₂ #j )
+          case system_setup
+          solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+                 ) ▶₃ #j )
+            case create_access_policy
+            solve( !KU( encrypt(<'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                 em('g', 'g')^~alpha.1>,
+                                ~msg, <~attr1, ~attr2>, AND, ~uid)
+                   ) @ #vk )
+              case c_encrypt
+              solve( !KU( ~msg ) @ #vk.2 )
+                case encrypt_message_and
+                by solve( !KU( ~uid ) @ #vk.6 )
+              qed
+            next
+              case encrypt_message_and
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma only_decrypt_with_right_attributes_or:
+  all-traces
+  "∀ Broker m u uid CT att1 att2 #i #j #p.
+    (((EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+      (DecryptMessage_OR( u, m, att1 ) @ #j)) ∧
+     (DecryptMessage_OR( u, m, att2 ) @ #p)) ⇒
+    ((∃ uid.1 #k. GenerateKeyOr( u, Broker, uid.1, att1 ) @ #k) ∧
+     (∃ uid.1 #l. GenerateKeyOr( u, Broker, uid.1, att2 ) @ #l))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u uid CT att1 att2 #i #j #p.
+  (EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+  (DecryptMessage_OR( u, m, att1 ) @ #j) ∧
+  (DecryptMessage_OR( u, m, att2 ) @ #p)
+ ∧
+  ((∀ uid.1 #k. (GenerateKeyOr( u, Broker, uid.1, att1 ) @ #k) ⇒ ⊥) ∨
+   (∀ uid.1 #l. (GenerateKeyOr( u, Broker, uid.1, att2 ) @ #l) ⇒ ⊥))"
+*/
+simplify
+solve( (∀ uid #k.
+         (GenerateKeyOr( $U.1, $Broker, uid, ~attr1 ) @ #k) ⇒ ⊥)  ∥
+       (∀ uid #l.
+         (GenerateKeyOr( $U.1, $Broker, uid, ~attr2 ) @ #l) ⇒ ⊥) )
+  case case_1
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₁ #i )
+      case create_access_policy
+      solve( !User( $U, ~uid ) ▶₃ #i )
+        case user_registration
+        solve( !User_AccessKey_OR( $U.1, ~uid.1, ~attr1,
+                                   keygen(MPK, x, ~x.1, ~uid.1)
+               ) ▶₁ #j )
+          case generate_key_or
+          solve( !Broker_MasterPublicKey( $Broker.1,
+                                          <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                           em('g', 'g')^~alpha.1>
+                 ) ▶₂ #j )
+            case system_setup
+            solve( !AccessPolicy( ~attr1, ~attr2.1, <~attr1, ~attr2.1>, ~uid
+                   ) ▶₃ #j )
+              case create_access_policy
+              by solve( !User_AccessKey_OR( $U, ~uid.1, ~attr2,
+                                            keygen(MPK, x, ~x.1, ~uid.1)
+                        ) ▶₁ #p )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case case_2
+  solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₁ #i )
+      case create_access_policy
+      solve( !User( $U, ~uid ) ▶₃ #i )
+        case user_registration
+        solve( !User_AccessKey_OR( $U.1, ~uid.1, ~attr1,
+                                   keygen(MPK, x, ~x.1, ~uid.1)
+               ) ▶₁ #j )
+          case generate_key_or
+          solve( !Broker_MasterPublicKey( $Broker.1,
+                                          <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                           em('g', 'g')^~alpha.1>
+                 ) ▶₂ #j )
+            case system_setup
+            solve( !AccessPolicy( ~attr1, ~attr2.1, <~attr1, ~attr2.1>, ~uid
+                   ) ▶₃ #j )
+              case create_access_policy
+              by solve( !User_AccessKey_OR( $U, ~uid.1, ~attr2,
+                                            keygen(MPK, x, ~x.1, ~uid.1)
+                        ) ▶₁ #p )
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma decrypt_with_encrypted_message_and:
+  all-traces
+  "∀ m u att1 att2 #i.
+    (DecryptMessage_AND( u, m, <att1, att2> ) @ #i) ⇒
+    (∃ Broker uid CT #k.
+      EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #k)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m u att1 att2 #i.
+  (DecryptMessage_AND( u, m, <att1, att2> ) @ #i)
+ ∧
+  ∀ Broker uid CT #k.
+   (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #k) ⇒ ⊥"
+*/
+simplify
+solve( !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>,
+                            keygen(MPK, x, <~attr1, ~attr2>, ~uid)
+       ) ▶₁ #i )
+  case generate_key_and
+  solve( !Broker_MasterPublicKey( $Broker,
+                                  <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+         ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                           em('g', 'g')^~alpha>,
+                          ~msg, <~attr1, ~attr2>, AND, ~uid)
+             ) @ #vk )
+        case c_encrypt
+        solve( !KU( ~msg ) @ #vk.2 )
+          case encrypt_message_and
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_multi_case_1
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_2
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_3
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_4
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_5
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_multi_case_6
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_or_case_1
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_or_case_2
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case fresh
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_001
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_002
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_003
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_004
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_005
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_006
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_007
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_008
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_009
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_010
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_011
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_012
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_013
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_014
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_015
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_016
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_017
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_018
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_019
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_020
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_021
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_022
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_023
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_024
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_025
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_026
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_027
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_028
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_029
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_030
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_031
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_032
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_033
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_034
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_035
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_036
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_037
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_038
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_039
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_040
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_041
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_042
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_043
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_044
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_045
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_046
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_047
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_048
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_049
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_050
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_051
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_052
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_053
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_054
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_055
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_056
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_057
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_058
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_059
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_060
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_061
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_062
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_063
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_064
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_065
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_066
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_067
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_068
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_069
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_070
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_071
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_072
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_073
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_074
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_075
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_076
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_077
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_078
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_079
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_080
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_081
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_082
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_083
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_084
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_085
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_086
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_087
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_088
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_089
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_090
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_091
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_092
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_093
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_094
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_095
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_096
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_097
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_098
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_099
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_100
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_101
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_102
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_103
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_104
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_105
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_106
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_107
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_108
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_109
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_110
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_111
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_112
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_113
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_114
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_115
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_116
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_117
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_118
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_119
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_120
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_121
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_122
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_123
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_124
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_125
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_126
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_127
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_128
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_129
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_130
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_131
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_132
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_133
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_134
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_135
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_136
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_137
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_138
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_139
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_140
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_141
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_142
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_143
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_144
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_145
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_146
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_147
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_148
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_149
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_150
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_151
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_152
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_153
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_154
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_155
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_156
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_157
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_158
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_159
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_160
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_161
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_162
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_163
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_164
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_165
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_166
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_167
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_168
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_169
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_170
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_171
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_172
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_173
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_174
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_175
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_176
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_177
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_178
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_179
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_180
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_181
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_182
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_183
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_184
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_185
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_186
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_187
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_188
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_189
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_190
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_191
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_192
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_193
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_194
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_195
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_196
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_197
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_198
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_199
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_200
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_201
+          by solve( !KU( ~uid ) @ #vk.5 )
+        qed
+      next
+        case encrypt_message_and
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+qed
+
+lemma decrypt_with_encrypted_message_or:
+  all-traces
+  "∀ m u att1 #i.
+    (DecryptMessage_OR( u, m, att1 ) @ #i) ⇒
+    (∃ Broker uid CT att2 #k.
+      EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #k)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m u att1 #i.
+  (DecryptMessage_OR( u, m, att1 ) @ #i)
+ ∧
+  ∀ Broker uid CT att2 #k.
+   (EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid ) @ #k) ⇒ ⊥"
+*/
+simplify
+solve( !User_AccessKey_OR( $U, ~uid, ~attr1,
+                           keygen(MPK, x, ~x.1, ~uid)
+       ) ▶₁ #i )
+  case generate_key_or
+  solve( !Broker_MasterPublicKey( $Broker,
+                                  <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+         ) ▶₂ #i )
+    case system_setup
+    solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+           ) ▶₃ #i )
+      case create_access_policy
+      solve( !KU( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                           em('g', 'g')^~alpha>,
+                          ~msg, <~attr1, ~attr2>, OR, ~uid)
+             ) @ #vk )
+        case c_encrypt
+        solve( !KU( ~msg ) @ #vk.2 )
+          case encrypt_message_and
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_multi_case_1
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_2
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_3
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_4
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case encrypt_message_multi_case_5
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_multi_case_6
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_or_case_1
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case encrypt_message_or_case_2
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case fresh
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_001
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_002
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_003
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_004
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_005
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_006
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_007
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_008
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_009
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_010
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_011
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_012
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_013
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_014
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_015
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_016
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_017
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_018
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_019
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_020
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_021
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_022
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_023
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_024
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_025
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_026
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_027
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_028
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_029
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_030
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_031
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_032
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_033
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_034
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_035
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_036
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_037
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_038
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_039
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_040
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_041
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_042
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_043
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_044
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_045
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_046
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_047
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_048
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_049
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_050
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_051
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_052
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_053
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_054
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_055
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_056
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_057
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_058
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_059
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_060
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_061
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_062
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_063
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_064
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_065
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_066
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_067
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_068
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_069
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_070
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_071
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_072
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_073
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_074
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_075
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_076
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_077
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_078
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_079
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_080
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_081
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_082
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_083
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_084
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_085
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_086
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_087
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_088
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_089
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_090
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_091
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_092
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_093
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_094
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_095
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_096
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_097
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_098
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_099
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_100
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_101
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_102
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_103
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_104
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_105
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_106
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_107
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_108
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_109
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_110
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_111
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_112
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_113
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_114
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_115
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_116
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_117
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_118
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_119
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_120
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_121
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_122
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_123
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_124
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_125
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_126
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_127
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_128
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_129
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_130
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_131
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_132
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_133
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_134
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_135
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_136
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_137
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_138
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_139
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_140
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_141
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_142
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_143
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_144
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_145
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_146
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_147
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_148
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_149
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_150
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_151
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_152
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_153
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_154
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_155
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_156
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_157
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_158
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_159
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_160
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_161
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_162
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_163
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_164
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_165
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_166
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_167
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_168
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_169
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_170
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_171
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_172
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_173
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_174
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_175
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_176
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_177
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_178
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_179
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_180
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_181
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_182
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_183
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_184
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_185
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_186
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_187
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_188
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_189
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_190
+          by solve( !KU( ~uid ) @ #vk.7 )
+        next
+          case reveal_MSKey_case_191
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_192
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_193
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_194
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_195
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_196
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_197
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_198
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_199
+          by solve( !KU( ~uid ) @ #vk.6 )
+        next
+          case reveal_MSKey_case_200
+          by solve( !KU( ~uid ) @ #vk.5 )
+        next
+          case reveal_MSKey_case_201
+          by solve( !KU( ~uid ) @ #vk.5 )
+        qed
+      next
+        case encrypt_message_or
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+qed
+
+lemma consistency_check:
+  all-traces
+  "∀ Broker m u uid CT att1 att2 #i #j.
+    ((EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+     (DecryptMessage_OR( u, m, att1 ) @ #j)) ⇒
+    (⊥)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u uid CT att1 att2 #i #j.
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid ) @ #i) ∧
+  (DecryptMessage_OR( u, m, att1 ) @ #j)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !User_AccessKey_OR( $U.1, ~uid.1, ~attr1,
+                                 keygen(MPK, x, ~x.1, ~uid.1)
+             ) ▶₁ #j )
+        case generate_key_or
+        solve( !Broker_MasterPublicKey( $Broker.1,
+                                        <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                         em('g', 'g')^~alpha.1>
+               ) ▶₂ #j )
+          case system_setup
+          solve( !AccessPolicy( ~attr1, ~attr2.1, <~attr1, ~attr2.1>, ~uid
+                 ) ▶₃ #j )
+            case create_access_policy
+            solve( !KU( encrypt(<'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                 em('g', 'g')^~alpha.1>,
+                                ~msg, <~attr1, ~attr2.1>, OR, ~uid)
+                   ) @ #vk )
+              case c_encrypt
+              solve( !KU( ~msg ) @ #vk.2 )
+                case encrypt_message_and
+                by solve( !KU( ~uid ) @ #vk.6 )
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_decryption_without_key:
+  all-traces
+  "∀ m u att1 att2 #i.
+    (DecryptMessage_AND( u, m, <att1, att2> ) @ #i) ⇒
+    (∃ Broker uid #j.
+      GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #j)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ m u att1 att2 #i.
+  (DecryptMessage_AND( u, m, <att1, att2> ) @ #i)
+ ∧
+  ∀ Broker uid #j.
+   (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #j) ⇒ ⊥"
+*/
+simplify
+solve( !User_AccessKey_AND( $U, ~uid, <~attr1, ~attr2>,
+                            keygen(MPK, x, <~attr1, ~attr2>, ~uid)
+       ) ▶₁ #i )
+  case generate_key_and
+  by contradiction /* from formulas */
+qed
+
+lemma only_correct_user_can_decrypt:
+  all-traces
+  "∀ Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+    (((EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid1 ) @ #i) ∧
+      (GenerateKeyAnd( u2, Broker, uid2, <att1, att2> ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(∃ #k. DecryptMessage_AND( u2, m, <att1, att2> ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT, uid1 ) @ #i) ∧
+  (GenerateKeyAnd( u2, Broker, uid2, <att1, att2> ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧
+  (∃ #k. (DecryptMessage_AND( u2, m, <att1, att2> ) @ #k))"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+        case system_setup
+        solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+          case system_setup
+          solve( !User( $U.1, ~uid.1 ) ▶₂ #j )
+            case user_registration
+            solve( !FirstAttribute( $Broker, ~attr1, ~uid.1 ) ▶₃ #j )
+              case generate_attributes
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma only_correct_user_can_decrypt_or:
+  all-traces
+  "∀ Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+    (((EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid1 ) @ #i) ∧
+      (GenerateKeyOr( u2, Broker, uid2, att1 ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(∃ #k. DecryptMessage_OR( u2, m, att1 ) @ #k))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m u2 uid1 uid2 att1 att2 CT #i #j.
+  (EncryptMessage_OR( Broker, m, <att1, att2>, CT, uid1 ) @ #i) ∧
+  (GenerateKeyOr( u2, Broker, uid2, att1 ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧ (∃ #k. (DecryptMessage_OR( u2, m, att1 ) @ #k))"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+        case system_setup
+        solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+          case system_setup
+          solve( !User( $U.1, ~uid.1 ) ▶₂ #j )
+            case user_registration
+            solve( !FirstAttribute( $Broker, ~attr1, ~uid.1 ) ▶₃ #j )
+              case generate_attributes
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma multi_message_decryption:
+  all-traces
+  "∀ Broker m1 m2 key att1 att2 att3 CT uid #i #j.
+    ((EncryptMessageMulti( Broker, <m1, m2>,
+                           <<att1, att2>, att1, att3>, <OR, AND>, CT, uid
+      ) @ #i) ∧
+     (SecretKeyAND( key, uid ) @ #j)) ⇒
+    ((∃ u #k. (DecryptMessageMulti( u ) @ #k) ∧ (Decrypt( m1 ) @ #k)) ∧
+     (¬(∃ #l. Decrypt( m2 ) @ #l)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m1 m2 key att1 att2 att3 CT uid #i #j.
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att3>,
+                        <OR, AND>, CT, uid
+   ) @ #i) ∧
+  (SecretKeyAND( key, uid ) @ #j)
+ ∧
+  ((∀ u #k.
+     (DecryptMessageMulti( u ) @ #k) ∧ (Decrypt( m1 ) @ #k) ⇒ ⊥) ∨
+   (∃ #l. (Decrypt( m2 ) @ #l)))"
+*/
+by simplify
+
+lemma consistency_multi_message_output:
+  all-traces
+  "∀ Broker m1 m2 decrypted1 decrypted2 att1 att2 CT u uid #i #j.
+    (((((EncryptMessageMulti( Broker, <m1, m2>,
+                              <<att1, att2>, att1, att2>, <AND, AND>, CT, uid
+         ) @ #i) ∧
+        (DecryptMessageMulti( u ) @ #j)) ∧
+       (Decrypt( decrypted1 ) @ #j)) ∧
+      (Decrypt( decrypted2 ) @ #j)) ∧
+     (Equality( <m1, m2>, <decrypted1, decrypted2> ) @ #j)) ⇒
+    ((m1 = decrypted1) ∧ (m2 = decrypted2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m1 m2 decrypted1 decrypted2 att1 att2 CT u uid #i #j.
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT, uid
+   ) @ #i) ∧
+  (DecryptMessageMulti( u ) @ #j) ∧
+  (Decrypt( decrypted1 ) @ #j) ∧
+  (Decrypt( decrypted2 ) @ #j) ∧
+  (Equality( <m1, m2>, <decrypted1, decrypted2> ) @ #j)
+ ∧
+  ((¬(m1 = decrypted1)) ∨ (¬(m2 = decrypted2)))"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma unique_key_for_and:
+  all-traces
+  "∀ Broker u1 u2 uid att1 att2 #i #j.
+    ((GenerateKeyAnd( u1, Broker, uid, <att1, att2> ) @ #i) ∧
+     (GenerateKeyAnd( u2, Broker, uid, <att1, att2> ) @ #j)) ⇒
+    (u1 = u2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker u1 u2 uid att1 att2 #i #j.
+  (GenerateKeyAnd( u1, Broker, uid, <att1, att2> ) @ #i) ∧
+  (GenerateKeyAnd( u2, Broker, uid, <att1, att2> ) @ #j)
+ ∧
+  ¬(u1 = u2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+            case system_setup
+            solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+              case system_setup
+              solve( !User( $U.1, ~uid ) ▶₂ #j )
+                case user_registration
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma unique_user_registration:
+  all-traces
+  "∀ U U2 uid #i #j.
+    ((User_Registration( U, uid ) @ #i) ∧
+     (User_Registration( U2, uid ) @ #j)) ⇒
+    ((#i = #j) ∧ (U = U2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ U U2 uid #i #j.
+  (User_Registration( U, uid ) @ #i) ∧
+  (User_Registration( U2, uid ) @ #j)
+ ∧
+  ((¬(#i = #j)) ∨ (¬(U = U2)))"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma consistent_key_generation_for_same_user:
+  all-traces
+  "∀ u uid Broker att1 att2 key1 key2 #i #j.
+    ((((GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #i) ∧
+       (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #j)) ∧
+      (SecretKeyAND( key1, uid ) @ #i)) ∧
+     (SecretKeyAND( key2, uid ) @ #j)) ⇒
+    (key1 = key2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u uid Broker att1 att2 key1 key2 #i #j.
+  (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #i) ∧
+  (GenerateKeyAnd( u, Broker, uid, <att1, att2> ) @ #j) ∧
+  (SecretKeyAND( key1, uid ) @ #i) ∧
+  (SecretKeyAND( key2, uid ) @ #j)
+ ∧
+  ¬(key1 = key2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+            case system_setup
+            solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+              case system_setup
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma consistent_key_generation_for_same_user_or:
+  all-traces
+  "∀ u uid Broker att1 key1 key2 #i #j.
+    ((((GenerateKeyOr( u, Broker, uid, att1 ) @ #i) ∧
+       (GenerateKeyOr( u, Broker, uid, att1 ) @ #j)) ∧
+      (SecretKeyOR( key1, uid ) @ #i)) ∧
+     (SecretKeyOR( key2, uid ) @ #j)) ⇒
+    (key1 = key2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u uid Broker att1 key1 key2 #i #j.
+  (GenerateKeyOr( u, Broker, uid, att1 ) @ #i) ∧
+  (GenerateKeyOr( u, Broker, uid, att1 ) @ #j) ∧
+  (SecretKeyOR( key1, uid ) @ #i) ∧
+  (SecretKeyOR( key2, uid ) @ #j)
+ ∧
+  ¬(key1 = key2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+          case system_setup
+          solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+            case system_setup
+            by contradiction /* from formulas */
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma different_users_generate_different_keys:
+  all-traces
+  "∀ u1 u2 Broker uid1 uid2 att1 att2 key1 key2 #i #j.
+    (((((GenerateKeyAnd( u1, Broker, uid1, <att1, att2> ) @ #i) ∧
+        (GenerateKeyAnd( u2, Broker, uid2, <att1, att2> ) @ #j)) ∧
+       (SecretKeyAND( key1, uid1 ) @ #i)) ∧
+      (SecretKeyAND( key2, uid2 ) @ #j)) ∧
+     (¬(u1 = u2))) ⇒
+    (¬(key1 = key2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u1 u2 Broker uid1 uid2 att1 att2 key1 key2 #i #j.
+  (GenerateKeyAnd( u1, Broker, uid1, <att1, att2> ) @ #i) ∧
+  (GenerateKeyAnd( u2, Broker, uid2, <att1, att2> ) @ #j) ∧
+  (SecretKeyAND( key1, uid1 ) @ #i) ∧
+  (SecretKeyAND( key2, uid2 ) @ #j)
+ ∧
+  (¬(u1 = u2)) ∧ (key1 = key2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          solve( !Broker_MasterPublicKey( $Broker,
+                                          <'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>
+                 ) ▶₀ #j )
+            case system_setup
+            solve( !Broker_MasterSecretKey( $Broker,
+                                            <~alpha, ~beta1, ~beta2, ~beta3, ~theta>
+                   ) ▶₁ #j )
+              case system_setup
+              solve( !User( $U.1, ~uid ) ▶₂ #j )
+                case user_registration
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma encryption_different_for_different_users:
+  all-traces
+  "∀ Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+    (((EncryptMessage_AND( Broker, m, <att1, att2>, CT1, uid1 ) @ #i) ∧
+      (EncryptMessage_AND( Broker, m, <att1, att2>, CT2, uid2 ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(CT1 = CT2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT1, uid1 ) @ #i) ∧
+  (EncryptMessage_AND( Broker, m, <att1, att2>, CT2, uid2 ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧ (CT1 = CT2)"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma encryption_different_for_different_users_or:
+  all-traces
+  "∀ Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+    (((EncryptMessage_OR( Broker, m, <att1, att2>, CT1, uid1 ) @ #i) ∧
+      (EncryptMessage_OR( Broker, m, <att1, att2>, CT2, uid2 ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(CT1 = CT2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  (EncryptMessage_OR( Broker, m, <att1, att2>, CT1, uid1 ) @ #i) ∧
+  (EncryptMessage_OR( Broker, m, <att1, att2>, CT2, uid2 ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧ (CT1 = CT2)"
+*/
+simplify
+by contradiction /* from formulas */
+
+lemma non_malleability:
+  all-traces
+  "∀ Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+    (((EncryptMessage_AND( Broker, m1, <att1, att2>, CT1, uid ) @ #i) ∧
+      (DecryptMessage_AND( u, m2, <att1, att2> ) @ #j)) ∧
+     (Equality( CT1, CT2 ) @ #i)) ⇒
+    (m1 = m2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+  (EncryptMessage_AND( Broker, m1, <att1, att2>, CT1, uid ) @ #i) ∧
+  (DecryptMessage_AND( u, m2, <att1, att2> ) @ #j) ∧
+  (Equality( CT1, CT2 ) @ #i)
+ ∧
+  ¬(m1 = m2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !User_AccessKey_AND( $U.1, ~uid.1, <~attr1, ~attr2>,
+                                  keygen(MPK, x, <~attr1, ~attr2>, ~uid.1)
+             ) ▶₁ #j )
+        case generate_key_and
+        solve( !Broker_MasterPublicKey( $Broker.1,
+                                        <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                         em('g', 'g')^~alpha.1>
+               ) ▶₂ #j )
+          case system_setup
+          solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+                 ) ▶₃ #j )
+            case create_access_policy
+            by solve( Equality( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                                         em('g', 'g')^~alpha>,
+                                        ~msg, <~attr1, ~attr2>, AND, ~uid),
+                                encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>,
+                                        ~msg, <~attr1, ~attr2>, AND, ~uid)
+                      ) @ #i )
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma non_malleability_or:
+  all-traces
+  "∀ Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+    (((EncryptMessage_OR( Broker, m1, <att1, att2>, CT1, uid ) @ #i) ∧
+      (DecryptMessage_OR( u, m2, att1 ) @ #j)) ∧
+     (Equality( CT1, CT2 ) @ #i)) ⇒
+    (m1 = m2)"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m1 m2 u uid att1 att2 CT1 CT2 #i #j.
+  (EncryptMessage_OR( Broker, m1, <att1, att2>, CT1, uid ) @ #i) ∧
+  (DecryptMessage_OR( u, m2, att1 ) @ #j) ∧
+  (Equality( CT1, CT2 ) @ #i)
+ ∧
+  ¬(m1 = m2)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !AccessPolicy( ~attr1, ~attr2, <~attr1, ~attr2>, ~uid
+         ) ▶₁ #i )
+    case create_access_policy
+    solve( !User( $U, ~uid ) ▶₃ #i )
+      case user_registration
+      solve( !User_AccessKey_OR( $U.1, ~uid.1, ~attr1,
+                                 keygen(MPK, x, ~x.1, ~uid.1)
+             ) ▶₁ #j )
+        case generate_key_or
+        solve( !Broker_MasterPublicKey( $Broker.1,
+                                        <'g'^~beta1.1, 'g'^~beta2.1, 'g'^~beta3.1, 
+                                         em('g', 'g')^~alpha.1>
+               ) ▶₂ #j )
+          case system_setup
+          solve( !AccessPolicy( ~attr1, ~attr2.1, <~attr1, ~attr2.1>, ~uid
+                 ) ▶₃ #j )
+            case create_access_policy
+            by solve( Equality( encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, 
+                                         em('g', 'g')^~alpha>,
+                                        ~msg, <~attr1, ~attr2>, OR, ~uid),
+                                encrypt(<'g'^~beta1, 'g'^~beta2, 'g'^~beta3, em('g', 'g')^~alpha>,
+                                        ~msg, <~attr1, ~attr2>, OR, ~uid)
+                      ) @ #i )
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma no_attribute_collision:
+  all-traces
+  "∀ u uid1 uid2 Broker att1 att2 key1 key2 #i #j.
+    (((((GenerateKeyAnd( u, Broker, uid1, <att1, att2> ) @ #i) ∧
+        (GenerateKeyAnd( u, Broker, uid2, <att1, att2> ) @ #j)) ∧
+       (SecretKeyAND( key1, uid1 ) @ #i)) ∧
+      (SecretKeyAND( key2, uid2 ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(<att1, att2> = <att1, att2>))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u uid1 uid2 Broker att1 att2 key1 key2 #i #j.
+  (GenerateKeyAnd( u, Broker, uid1, <att1, att2> ) @ #i) ∧
+  (GenerateKeyAnd( u, Broker, uid2, <att1, att2> ) @ #j) ∧
+  (SecretKeyAND( key1, uid1 ) @ #i) ∧
+  (SecretKeyAND( key2, uid2 ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧ (<att1, att2> = <att1, att2>)"
+*/
+simplify
+solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #i )
+  case system_setup
+  solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #i )
+    case system_setup
+    solve( !User( $U, ~uid ) ▶₂ #i )
+      case user_registration
+      solve( !FirstAttribute( $Broker, ~attr1, ~uid ) ▶₃ #i )
+        case generate_attributes
+        solve( !SecondAttribute( $Broker, ~attr2, ~uid ) ▶₄ #i )
+          case generate_attributes
+          solve( !Broker_MasterPublicKey( $Broker, MPK ) ▶₀ #j )
+            case system_setup
+            solve( !Broker_MasterSecretKey( $Broker, MSK ) ▶₁ #j )
+              case system_setup
+              solve( !User( $U, ~uid.1 ) ▶₂ #j )
+                case user_registration
+                solve( !FirstAttribute( $Broker, ~attr1, ~uid.1 ) ▶₃ #j )
+                  case generate_attributes
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma unique_ciphertext_multi_users:
+  all-traces
+  "∀ Broker m1 m2 att1 att2 CT1 CT2 uid1 uid2 #i #j.
+    (((EncryptMessageMulti( Broker, <m1, m2>,
+                            <<att1, att2>, att1, att2>, <AND, AND>, CT1, uid1
+       ) @ #i) ∧
+      (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                            <AND, AND>, CT2, uid2
+       ) @ #j)) ∧
+     (¬(uid1 = uid2))) ⇒
+    (¬(CT1 = CT2))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ Broker m1 m2 att1 att2 CT1 CT2 uid1 uid2 #i #j.
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT1, uid1
+   ) @ #i) ∧
+  (EncryptMessageMulti( Broker, <m1, m2>, <<att1, att2>, att1, att2>,
+                        <AND, AND>, CT2, uid2
+   ) @ #j)
+ ∧
+  (¬(uid1 = uid2)) ∧ (CT1 = CT2)"
+*/
+simplify
+by contradiction /* from formulas */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.10.0
+Maude version 2.7.1
+Git revision: UNKNOWN, branch: UNKNOWN
+Compiled at: 2024-10-30 13:42:18.081591 UTC
+*/
+
+end
