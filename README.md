@@ -53,6 +53,7 @@ Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encrypt
 
 🚀 You can use any of the following methods to set up the required runtime environment for the scheme. We have also built a Docker image for this environment, and we highly recommend using Docker for quick configuration:
 
+---
 ### 🐳 Docker Setup
 
 ```bash
@@ -71,7 +72,7 @@ git clone https://github.com/LimeFavoredOrange/PD-CP-ABE.git
 # Get into the repo and play around with it
 cd PD-CP-ABE
 ```
-
+---
 ### 📝 Script Setup
 
 ```bash
@@ -103,6 +104,7 @@ The above script sets up the dependencies and environment required to run charm-
 - PBC (latest) [http://crypto.stanford.edu/pbc/news.html]
 - OPENSSL [http://www.openssl.org/]
 
+---
 ### 🔥 Interactive Server Deployment
 
 To give users a hands-on experience with our scheme, we have deployed a simple server that allows you to quickly explore the functionality of our solution. You can fork the API collection using the Postman button below. The server currently supports the following features:
@@ -113,6 +115,7 @@ To give users a hands-on experience with our scheme, we have deployed a simple s
 2. **Generate Access Key**: This feature generates an access key based on the provided attribute set and user information. After receiving the response, save the access key locally by using the save option in the upper right corner of the Postman response window. The access key is returned as a JSON file.
 3. **Encryption**: Encrypt the provided information using this feature. Once the response is received, save the encrypted data locally through the Postman response window. The encrypted data is returned as a ZIP file.
 4. **Decryption**: This feature decrypts the encrypted information. After receiving the response, save the decrypted data locally through the Postman response window. The decrypted data is returned as a JSON file.
+
 
 #### How to Save Responses Locally:
 
@@ -134,6 +137,7 @@ Please note that this server is a simple deployment hosted on an old desktop, so
 
 Dive into the practical application of our CP-ABE scheme with the `example.py` script located in the `Examples` folder. This script is your gateway to experimenting with the full capabilities of our encryption system. Follow these steps to see the scheme in action:
 
+---
 ### Setup
 
 Initialize the encryption scheme's parameters with `setup`. This prepares the system by setting up the initial environment parameters.
@@ -143,6 +147,7 @@ Initialize the encryption scheme's parameters with `setup`. This prepares the sy
 mpk, msk = target.setup()
 ```
 
+---
 ### Key Generation
 
 Generate private access keys based on a set of attributes with Key Generation. This function crafts keys that are pivotal for decrypting messages encrypted under corresponding policies.
@@ -158,7 +163,7 @@ user_name = "Alice"
 # Generate the key for the user
 key = target.keygen(mpk, msk, user_attributes, user_name)
 ```
-
+---
 ### Export Key to File
 
 Save the generated private keys locally using export_key_to_file. The keys are stored in the same directory as key.pkl, ensuring they are readily available for future decryption processes.
@@ -167,6 +172,7 @@ Save the generated private keys locally using export_key_to_file. The keys are s
 abe_utils.export_key_to_file(target.group, "key", key)
 ```
 
+---
 ### Encrypt
 
 Encrypt a list of messages with corresponding access policies using encrypt. This function secures your data under the defined conditions, making sure only those with matching attributes can decrypt it.
@@ -175,6 +181,7 @@ Encrypt a list of messages with corresponding access policies using encrypt. Thi
 ct, data = target.encrypt(mpk, messages, access_policies)
 ```
 
+---
 ### Export Ciphers to File
 
 After encryption, export the ciphertexts to local storage with export_ciphers_to_file. It creates a folder named after the provided name and saves ciphers.pkl and data.pkl inside it, encapsulating all necessary encrypted data.
@@ -184,6 +191,7 @@ After encryption, export the ciphertexts to local storage with export_ciphers_to
 abe_utils.export_ciphers_to_file(target.group, ct, data, "ciphers")
 ```
 
+---
 ### Read data from File
 
 Load a previously saved access key from a local file with read_key_from_file.
@@ -197,6 +205,7 @@ key = abe_utils.read_key_from_file(target.group, "key")
 ct, data = abe_utils.read_ciphers(target.group, "ciphers")
 ```
 
+---
 ### Decrypt
 
 Attempt to decrypt the loaded ciphertexts using the decrypt function.
@@ -205,16 +214,19 @@ Attempt to decrypt the loaded ciphertexts using the decrypt function.
 result = target.decrypt(data, key, ct)
 ```
 
+---
 ### 🛠️ Run your own Tests
 
 At the beginning of example.py, several variables are initialized to provide encryption data. Feel free to modify these to fit your testing needs.
 
 <img width="733" alt="Customization" src="./readme_src/Customization.png">
 
+---
 ## Construction Details
 
 Dive into the architecture of our Partially Decryptable Ciphertext Policy Attribute-Based Encryption (CP-ABE) Scheme. This section breaks down the main functions of the scheme, providing insights into its implementation and operational mechanics.
 
+---
 ### Setup
 
 The `Setup(λ) → (MPK, MSK)` function is run by the service provider (SP) for system initialization. The SP inputs a security parameter $`\lambda`$ and selects a bilinear mapping $`e :\ G_0 \times G_0 \rightarrow G_T `$ with a cyclic multiplicative group $`G_0`$, a generator $`g`$, and a prime order $`p`$. This algorithm defines the hash functions as follows:
@@ -255,6 +267,7 @@ For all $`j \in [1, N_i]`$, the CA computes:
 \forall j \in [1, N_i]: \ \  \hat{D}_{i,j} = g^{r_{i} + \omega_1} H_1(att_{i,j})^{r_{i,j}},\  \quad \check{D}_{i,j} = g^{r_{i,j}}
 ```
 
+---
 ### Encryption
 
 The `Encrypt(MPK, cki, T) → (CT)` function is executed by the data owner (DO) for encryption. The DO randomly selects $`\kappa`$ symmetric keys $`ck = \{ck_1, ck_2, \ldots, ck_\kappa\}`$ to encrypt the corresponding $`\kappa`$ messages $`E_{ck}(M) = \{E_{ck_1}(M_1), E_{ck_2}(M_2), \ldots, E_{ck_\kappa}(M_\kappa)\}`$, and hierarchically encrypts the symmetric keys $`ck`$. DO set up a hierarchical access control tree $`T`$ and associates each symmetric key $`ck_i`$ ($`i = 1, \ldots, \kappa`$) with a level node $`L_i`$ in $`T`$, where $`s_i \in \mathbb{Z}_p`$ is the secret number corresponding to the level nodes. Moreover, the DO randomly chooses a data noise vector $`\varepsilon = \{\varepsilon_1, \varepsilon_2, \ldots, \varepsilon_\kappa\}`$ ($`\varepsilon_i \in \mathbb{Z}_p`$ for each level node $`L_i`$). Then, it calculates the level ciphertexts as:
@@ -269,6 +282,7 @@ Next, the DO chooses a $`(k_x - 1)`$-order polynomial function $`q_x()`$, and as
 \hat{C}_x = g^{q_x(0)}, \quad \check{C}_x = H_1(att(x))^{q_x(0)}
 ```
 
+---
 ### Decryption
 
 The `Decrypt(MPK, CT, SK_i) → (ck_i)` function is executed by the data user (DU) to decrypt the ciphertext. DU computes $`F_x`$ using the following steps:
@@ -303,6 +317,7 @@ Finally, DU recovers $`ck_i`$ as follows:
 \frac{C_{L_i}}{\tilde{F}_i} = \frac{ck_i \cdot e\left(g, g\right)^{\alpha(s_i + \epsilon_i)}}{e\left(g, g\right)^{\alpha(s_i + \epsilon_i)}} = ck_i
 ```
 
+---
 ## Modified Data Structure
 
 In the `PD-CP-ABE` scheme, we have redesigned the data structure used to represent access structures, which plays a crucial role in generating encryption parameters and implementing access control during the encryption and decryption processes. The access structure is typically represented as a `tree` in traditional CP-ABE. The root node corresponds to the symmetric encryption key, leaf nodes represent attribute nodes, and intermediate nodes are threshold nodes that connect other nodes. For example, if the access policy is `(Family and Trusted) or (Manager and Legal)` and `(Family and Trusted) or (Manager or Legal)`, the corresponding access tree would look like this:
@@ -325,6 +340,193 @@ For the same access policy, `(Family and Trusted) or (Manager and Legal)` and `(
 
 In our data structure, there is no longer a single root node. Instead, each key pair is associated with the corresponding atom node. The process begins by generating an atom node for each key. Next, we extract the attribute set $`A`$ from the access policy set provided by the user, for each element $`a`$ in $`A`$, an attribute node is created. Finally, depending on the requirements, each atom node is linked with the appropriate nodes according to its specific access policy.
 
+
+## Formal Verification 🔐
+
+For the security and reliability of PD-CP-ABE, we have rigorously modeled and tested the scheme using **formal verification** techniques.
+
+We utilized the [**Tamarin Prover**](https://tamarin-prover.com), a security protocol verification tool that supports both falsification (attack finding) and unbounded verification (proving) in the symbolic model. We have used it to verify the secrecy, integrity, and collusion-resistance properties of our scheme. Our formal verification scripts and specifications can be found in the [`/Formal_Verification`](./Formal_Verification) directory.
+
+---
+### 🛠️ Overview of Formal Verification
+
+Formal verification ensures that the cryptographic system adheres to its specified security properties by mathematically proving that all possible protocol executions conform to the expected outcomes.
+
+The `PD_CP_ABE.spthy` file located in `/Formal_Verification` defines the behavior and properties of our scheme, including encryption, key generation, and decryption. It is written in the **multiset rewriting rules** and captures the following security goals:
+
+
+---
+### 🔎 Verified Security Properties
+
+1. **Secrecy of the Encrypted Data**  
+   - **Purpose**: Ensures that encrypted messages, keys, and user IDs remain confidential unless explicitly revealed (e.g., via `RevealMSK`).  
+   - **Key Lemmas**:  
+     - `secret_message_and`: Proves that messages encrypted under AND-based policies remain confidential unless the master secret key (MSK) is explicitly revealed.  
+     - `secret_message_or`: Demonstrates that messages encrypted with OR-based policies are confidential under the same premise.  
+     - `secret_master_secret_key`: Ensures that the MSK itself remains secret unless an explicit reveal action occurs.  
+     - `secret_user_key_and`, `secret_user_key_or`: Verifies that user access keys generated under both AND and OR policies remain secret.  
+     - `secret_message_multi`: In multi-message encryption, all messages remain confidential unless the MSK is leaked.
+
+2. **Collusion Resistance**  
+   - **Purpose**: Prevents users with different sets of attributes from combining their private keys to gain unauthorized access to messages.  
+   - **Key Lemma**:  
+     - `collusion_resistance`: Demonstrates that colluding users with partial access cannot combine keys to decrypt an AND-policy encrypted message.
+
+3. **Key Consistency and Uniqueness**  
+   - **Purpose**: Ensures that the same user consistently receives the same key for the same attribute set and prevents duplication.  
+   - **Key Lemmas**:  
+     - `consistent_key_generation_for_same_user`: Verifies that the same user always receives the same key for the same attribute set.  
+     - `consistent_key_generation_for_same_user_or`: The OR-based equivalent, ensuring consistent key generation for OR policies.  
+     - `unique_key_for_and`: Ensures that no duplicate AND-policy keys are generated for the same user and attributes.  
+     - `unique_user_registration`: Confirms that user IDs are registered uniquely, avoiding duplicate identities.  
+
+4. **Non-Malleability of Ciphertext**  
+   - **Purpose**: Ensures that attackers cannot alter the ciphertext to produce a valid ciphertext that decrypts to a different message.  
+   - **Key Lemmas**:  
+     - `non_malleability`: Confirms that AND-policy ciphertexts cannot be modified to decrypt as different messages.  
+     - `non_malleability_or`: Ensures the same for OR-policy ciphertexts.
+
+5. **Correctness of Decryption**  
+   - **Purpose**: Ensures that only users with the correct attributes and keys can decrypt messages.  
+   - **Key Lemmas**:  
+     - `only_decrypt_with_right_attributes_and`: Verifies that decryption of AND-policy ciphertexts requires the correct AND-policy keys.  
+     - `only_decrypt_with_right_attributes_or`: Confirms that OR-policy decryption is valid only when the user possesses at least one required attribute.  
+     - `decrypt_with_encrypted_message_and`, `decrypt_with_encrypted_message_or`: Ensures the ciphertext being decrypted corresponds to a legitimate encryption event.  
+     - `only_correct_user_can_decrypt`: Prevents decryption if the user’s ID does not match the encrypted `uid`.
+
+6. **Multi-Message Encryption Consistency**  
+   - **Purpose**: Ensures that multiple encrypted messages are handled correctly and cannot be partially decrypted outside of the user’s access rights.  
+   - **Key Lemmas**:  
+     - `consistency_multi_message_output`: Confirms that decrypted messages match the original encrypted content in multi-message scenarios.  
+     - `multi_message_decryption`: Ensures users can only decrypt the parts of the multi-message encryption for which they have matching attributes.
+
+7. **Attribute Collision Prevention and Ciphertext Distinction**  
+   - **Purpose**: Prevents key reuse attacks and attribute collision issues.  
+   - **Key Lemmas**:  
+     - `different_users_generate_different_keys`: Ensures that different users receive distinct keys for the same attribute set.  
+     - `encryption_different_for_different_users`: Confirms that different users receive distinct AND-encrypted ciphertexts for the same policy.  
+     - `encryption_different_for_different_users_or`: Confirms the same for OR-encrypted ciphertexts.  
+     - `no_attribute_collision`: Ensures that the same attribute set cannot be reused across different encryption events.  
+     - `unique_ciphertext_multi_users`: Ensures that ciphertexts generated for different users in multi-message encryption remain distinct.
+
+---
+### 📂 File Structure
+
+- **`PD_CP_ABE.spthy`**: The formal specification file written in the Tamarin Prover's input language (`spthy`). This file defines the system’s rules, events, and lemmas.
+- **`proofs/`**: This folder contains proof outputs and logs for reference.
+
+
+---
+### 📝 **Description of Key Lemmas**
+
+| **Lemma Name**               | **Description**                                                                                               | **Purpose**                                                                                   |
+|------------------------------|---------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `secret_message_and`          | Proves that messages encrypted under AND-based policies remain confidential unless the MSK is revealed.       | Ensures secrecy of AND-encrypted messages.                                                     |
+| `secret_message_or`           | Demonstrates that messages encrypted with OR-based policies remain secret unless the MSK is revealed.          | Ensures secrecy of OR-encrypted messages.                                                      |
+| `secret_user_key_or`          | Verifies that OR-policy keys remain confidential and cannot be inferred by unauthorized users.                 | Confirms key secrecy for OR-policy keys.                                                       |
+| `secret_user_key_and`         | Ensures that keys generated under AND policies remain confidential.                                            | Confirms key secrecy for AND-policy keys.                                                      |
+| `collusion_resistance`        | Prevents colluding users from combining keys to gain unauthorized access.                                      | Prevents unauthorized key combination for AND policies.                                         |
+| `non_malleability`            | Prevents valid ciphertexts from being modified to decrypt to a different message.                              | Ensures the integrity of AND-policy ciphertexts.                                                |
+| `non_malleability_or`         | Same as `non_malleability` but for OR-based ciphertexts.                                                        | Ensures integrity for OR-policy ciphertexts.                                                    |
+| `unique_user_registration`    | Ensures that each `uid` is registered only once by a unique entity.                                             | Maintains unique user registration consistency.                                                 |
+| `consistent_key_generation`   | Confirms that keys for the same attributes and user remain consistent across protocol runs.                     | Prevents inconsistencies or duplications in key generation.                                     |
+| `only_decrypt_with_right_attributes_and` | Verifies that only users with matching AND-policy keys can decrypt the message.                        | Prevents unauthorized decryption of AND-policy ciphertexts.                                     |
+| `consistency_multi_message_output` | Ensures that the decrypted multi-message content matches the original encrypted messages.                    | Confirms the integrity of multi-message encryption.                                              |
+
+---
+### 🚀 Running the Formal Verification
+
+To run the formal verification locally:
+
+1. **Install the Tamarin Prover**  
+   Follow the official installation instructions from [Tamarin's website](https://tamarin-prover.com/manual/master/book/002_installation.html).
+
+2. **Navigate to the Formal Verification Directory**
+   ```bash
+   cd /Formal_Verification
+   ```
+
+3. **Execute the Tamarin Prover**
+   Run the verification process:
+   ```bash
+   tamarin-prover PD_CP_ABE.spthy --prove
+   ```
+   Or if you want to use a GUI to show the proof step by step, you can run the following command instead.
+   Which will run a local server on **http://127.0.0.1:3001**
+   ```bash
+   tamarin-prover interactive PD_CP_ABE.spthy  
+   ```
+
+5. **Interpret the Results**
+   The output will display verification success or failure for each lemma, indicating whether the properties hold.
+   This is the summary output for the provided model.
+   ```bash
+   ==============================================================================
+   summary of summaries:
+
+   analyzed: PD_CP_ABE.spthy
+   processing time: 1397.24s
+    
+   executable_system_setup (exists-trace): verified (2 steps)
+   unique_system_setup (all-traces): verified (2 steps)
+   executable_reveal_MSKey (exists-trace): verified (3 steps)
+   executable_user_registration (exists-trace): verified (2 steps)
+   executable_generate_attributes (exists-trace): verified (3 steps)
+   executable_generate_key_or (exists-trace): verified (6 steps)
+   executable_generate_key_and (exists-trace): verified (7 steps)
+   executable_create_access_policy (exists-trace): verified (4 steps)
+   executable_encrypt_message_and (exists-trace): verified (5 steps)
+   executable_encrypt_message_or (exists-trace): verified (5 steps)
+   executable_decrypt_message_or (exists-trace): verified (6 steps)
+   executable_decrypt_message_and (exists-trace): verified (6 steps)
+   executable_broker (exists-trace): verified (30 steps)
+   executable_encrypt_message_multi (exists-trace): verified (4 steps)
+   executable_decrypt_message_multi (exists-trace): verified (16 steps)
+   secret_message_and (all-traces): verified (7 steps)
+   secret_message_or (all-traces): verified (8 steps)
+   secret_user_key_or (all-traces): verified (7 steps)
+   secret_user_key_and (all-traces): verified (8 steps)
+   secret_master_secret_key (all-traces): verified (5 steps)
+   secret_user_id (all-traces): verified (26 steps)
+   secret_message_multi (all-traces): verified (9 steps)
+   collusion_resistance (all-traces): verified (28 steps)
+   only_decrypt_with_right_attributes_and (all-traces): verified (11 steps)
+   only_decrypt_with_right_attributes_or (all-traces): verified (16 steps)
+   decrypt_with_encrypted_message_and (all-traces): verified (218 steps)
+   decrypt_with_encrypted_message_or (all-traces): verified (218 steps)
+   consistency_check (all-traces): verified (10 steps)
+   no_decryption_without_key (all-traces): verified (3 steps)
+   only_correct_user_can_decrypt (all-traces): verified (9 steps)
+   only_correct_user_can_decrypt_or (all-traces): verified (9 steps)
+   multi_message_decryption (all-traces): verified (1 steps)
+   consistency_multi_message_output (all-traces): verified (2 steps)
+   unique_key_for_and (all-traces): verified (10 steps)
+   unique_user_registration (all-traces): verified (2 steps)
+   consistent_key_generation_for_same_user (all-traces): verified (9 steps)
+   consistent_key_generation_for_same_user_or (all-traces): verified (8 steps)
+   different_users_generate_different_keys (all-traces): verified (10 steps)
+   encryption_different_for_different_users (all-traces): verified (2 steps)
+   encryption_different_for_different_users_or (all-traces): verified (2 steps)
+   non_malleability (all-traces): verified (8 steps)
+   non_malleability_or (all-traces): verified (8 steps)
+   no_attribute_collision (all-traces): verified (11 steps)
+   unique_ciphertext_multi_users (all-traces): verified (2 steps)
+   ==============================================================================
+   ```
+
+
+---
+### 📊 Verification Results
+
+All security properties specified in the `PD_CP_ABE.spthy` file passed verification with **no counterexamples found**. This validates the robustness of our encryption scheme and confirms its security properties.
+
+
+---
+### 🔗 Related Artifacts
+
+For further analysis and transparency, detailed proof logs and verification summaries are provided in the [`proofs/`](./Formal_Verification/proofs/) folder. These artifacts can be used to reproduce the results and inspect the internal proof steps.
+
+---
 ## Performance Comparison and Evaluation
 
 To assess the performance of our encryption scheme, we deployed it on a machine with the following configuration:
@@ -349,6 +551,9 @@ Each test was run 10 times, and the average result for each was calculated. The 
 | :---------------------------------------------: | :---------------------------------------------: |
 | ![Encryption_plot](./readme_src/encryption.png) | ![Decryption_plot](./readme_src/decryption.png) |
 
+
+
+---
 ### Setup Time Comparison
 
 | Scheme    | Average Execution Time (s) | Standard Deviation (s) | Median Execution Time (s) |
@@ -356,6 +561,9 @@ Each test was run 10 times, and the average result for each was calculated. The 
 | bsw07     | 0.041434                   | 0.000498               | 0.041600                  |
 | PD-CP-ABE | 0.010532                   | 0.000093               | 0.010526                  |
 
+
+
+---
 ### Keygen Time Comparison
 
 | Attributes/Atoms | Scheme    | Average Execution Time (s) | Standard Deviation (s) | Median Execution Time (s) |
@@ -369,6 +577,9 @@ Each test was run 10 times, and the average result for each was calculated. The 
 | 30               | bsw07     | 0.151705                   | 0.007741               | 0.146871                  |
 | 30               | PD-CP-ABE | 0.178180                   | 0.055502               | 0.150279                  |
 
+
+
+---
 ### Encryption Time Comparison
 
 | Attributes/Atoms | Scheme    | Average Execution Time (s) | Standard Deviation (s) | Median Execution Time (s) |
@@ -394,6 +605,8 @@ Each test was run 10 times, and the average result for each was calculated. The 
 | 1500             | bsw07     | 31.552992                  | 0.199178               | 31.470533                 |
 | 1500             | PD-CP-ABE | 0.871881                   | 0.016854               | 0.866368                  |
 
+
+---
 ### Decryption Time Comparison
 
 | Attributes/Atoms | Scheme    | Average Execution Time (s) | Standard Deviation (s) | Median Execution Time (s) |
@@ -443,6 +656,7 @@ When comparing the two encryption schemes, `bsw07` and `PD-CP-ABE`, we not only 
   - Performance Across atom Levels: Across all the atom levels, `PD-CP-ABE` consistently outperforms `bsw07` in decryption time. The difference is particularly notable at higher atom levels (640, 1280, 1500), where `PD-CP-ABE` decrypts in approximately 0.19 seconds, while `bsw07` takes significantly longer (up to 5.111895 seconds at 1500 atoms).
   - Variance: The standard deviation for `PD-CP-ABE` remains extremely low across all atom levels, demonstrating that its decryption performance is not only faster but also highly consistent.
 
+---
 ### Evaluation
 
 - In the initial setup phase of the encryption scheme, `PD-CP-ABE` not only outperforms bsw07 in performance, but its execution time is also more stable, indicating that our scheme is very efficient in the deployment phase and does not require high computing power in the deployment environment.
@@ -451,6 +665,7 @@ When comparing the two encryption schemes, `bsw07` and `PD-CP-ABE`, we not only 
 
 In conclusion, the `PD-CP-ABE` scheme demonstrates clear advantages for applications that require `CP-ABE` encryption of multiple messages, such as digital wills. Not only does it offer efficient system setup, but it also provides superior performance in both encryption and decryption, particularly as the number of messages or the number of shared access policies increases. Although `PD-CP-ABE` exhibits relatively weaker performance in key generation compared to `bsw07`, the impact on overall scheme efficiency is minimal when weighed against its other performance benefits.
 
+---
 ## Limitations and Future Work
 
 Currently, the `PD-CP-ABE` scheme supports access control based solely on the presence or absence of attributes about the access policy. While this is effective for many scenarios, it limits the expressiveness of the access control. A significant area for future work is the extension of the scheme to support attribute-based conditions that involve specific attribute values. For example, instead of simply verifying the existence of an "age" attribute, the scheme could be enhanced to evaluate conditions such as `age > 20`. This would allow for more granular and dynamic access control policies.
