@@ -7,8 +7,10 @@
 [![Docker](https://img.shields.io/badge/Docker-charm--crypto--ubuntu22.04-purple)](https://hub.docker.com/repository/docker/xinzhang9091/charm-crypto-ubuntu22.04/general)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 [![codecov](https://codecov.io/github/LimeFavoredOrange/PD-CP-ABE/graph/badge.svg?token=5BE5QNYHZ2)](https://codecov.io/github/LimeFavoredOrange/PD-CP-ABE)
+[![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Tamarin-brightgreen)](https://tamarin-prover.com)
 
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://app.getpostman.com/run-collection/23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f%26entityType%3Dcollection%26workspaceId%3D1f0a1601-87f1-4963-a3f1-9194ade5e62b)
+
 
 Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encryption (CP-ABE) Scheme**! This repo implements a CP-ABE scheme that allows for partial decryption, providing fine-grained access control securely and efficiently.🔐
 
@@ -345,6 +347,10 @@ In our data structure, there is no longer a single root node. Instead, each key 
 
 For the security and reliability of PD-CP-ABE, we have rigorously modeled and tested the scheme using **formal verification** techniques.
 
+
+![Tamarin_prover](https://github.com/user-attachments/assets/7e5063e3-df51-4ffb-a13d-56fa972cb52d)
+
+
 We utilized the [**Tamarin Prover**](https://tamarin-prover.com), a security protocol verification tool that supports both falsification (attack finding) and unbounded verification (proving) in the symbolic model. We have used it to verify the secrecy, integrity, and collusion-resistance properties of our scheme. Our formal verification scripts and specifications can be found in the [`/Formal_Verification`](./Formal_Verification) directory.
 
 ---
@@ -352,7 +358,7 @@ We utilized the [**Tamarin Prover**](https://tamarin-prover.com), a security pro
 
 Formal verification ensures that the cryptographic system adheres to its specified security properties by mathematically proving that all possible protocol executions conform to the expected outcomes.
 
-The `PD_CP_ABE.spthy` file located in `/Formal_Verification` defines the behavior and properties of our scheme, including encryption, key generation, and decryption. It is written in the **multiset rewriting rules** and captures the following security goals:
+The [`PD_CP_ABE.spthy`](./Formal_Verification/PD_CP_ABE.spthy) file located in `/Formal_Verification` defines the behavior and properties of our scheme, including encryption, key generation, and decryption. It is written in the **multiset rewriting rules** and captures the following security goals:
 
 
 ---
@@ -432,6 +438,8 @@ The `PD_CP_ABE.spthy` file located in `/Formal_Verification` defines the behavio
 | `consistent_key_generation`   | Confirms that keys for the same attributes and user remain consistent across protocol runs.                     | Prevents inconsistencies or duplications in key generation.                                     |
 | `only_decrypt_with_right_attributes_and` | Verifies that only users with matching AND-policy keys can decrypt the message.                        | Prevents unauthorized decryption of AND-policy ciphertexts.                                     |
 | `consistency_multi_message_output` | Ensures that the decrypted multi-message content matches the original encrypted messages.                    | Confirms the integrity of multi-message encryption.                                              |
+
+**⚠️ Note:** The details of all lemmas are not fully described here. For a comprehensive overview, please refer to the [`PD_CP_ABE.spthy`](./Formal_Verification/PD_CP_ABE.spthy) file for more details.
 
 ---
 ### 🚀 Running the Formal Verification
