@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.7.17-blue)](https://www.python.org/downloads/release/python-3717/)
 [![Charm-Crypto](https://img.shields.io/badge/Charm--Crypto-0.50-blue)](https://jhuisi.github.io/charm/)
-[![Docker](https://img.shields.io/badge/Docker-charm--crypto--ubuntu22.04-purple)](https://hub.docker.com/repository/docker/xinzhang9091/charm-crypto-ubuntu22.04/general)
+[![Docker](https://img.shields.io/badge/Docker-partially--decryptable--cpabe-purple)](https://hub.docker.com/r/xinzhang9091/partially-decryptable-cpabe)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 [![codecov](https://codecov.io/github/LimeFavoredOrange/PD-CP-ABE/graph/badge.svg?token=5BE5QNYHZ2)](https://codecov.io/github/LimeFavoredOrange/PD-CP-ABE)
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Tamarin-brightgreen)](https://tamarin-prover.com)
@@ -64,16 +64,24 @@ Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encrypt
 # More info: https://docs.docker.com/engine/install/
 
 # Pull the image from Docker Hub
-docker pull xinzhang9091/charm-crypto-ubuntu22.04
+docker pull xinzhang9091/partially-decryptable-cpabe
 
 # Start the Docker container
-docker run -it xinzhang9091/charm-crypto-ubuntu22.04
+docker run -it --name pd-cpabe-container xinzhang9091/partially-decryptable-cpabe
 
-# Clone the GitHub repo
-git clone https://github.com/LimeFavoredOrange/PD-CP-ABE.git
+# If you want to test whether the installed version works correctly, you can run the preconfigured pytest suite.
+# Note: This might take some time depending on the performance of your device.
+cd Tests/pytest/
+pytest
 
-# Get into the repo and play around with it
-cd PD-CP-ABE
+# You should see 53 tests passed if all the components are working as expected on your container.
+# To test with your own input, follow the commands below and modify the code in the file, then run the test commands accordingly.
+cd ../../Examples/
+
+# Use nano or you can install or use any editor that you like to modify the example.py
+
+# Run the example file
+python example.py
 ```
 ---
 ### 📝 Script Setup
