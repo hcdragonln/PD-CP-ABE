@@ -14,7 +14,7 @@
 
 Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encryption (CP-ABE) Scheme**! This repo implements a CP-ABE scheme that allows for partial decryption, providing fine-grained access control securely and efficiently.🔐
 
-🔗 Link to paper:
+<!--🔗 Link to paper:-->
 
 <br />
 
@@ -118,6 +118,8 @@ The above script sets up the dependencies and environment required to run charm-
 ---
 ### 🔥 Interactive Server Deployment
 
+⏬ Download the files needed for interaction？ -> [Click to download the file bundle (.zip)](https://raw.githubusercontent.com/LimeFavoredOrange/PD-CP-ABE/main/Postman_Files/PD-CP-ABE-Postman-Files.zip)
+
 To give users a hands-on experience with our scheme, we have deployed a simple server that allows you to quickly explore the functionality of our solution. You can fork the API collection using the Postman button below. The server currently supports the following features:
 
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://app.getpostman.com/run-collection/23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f%26entityType%3Dcollection%26workspaceId%3D1f0a1601-87f1-4963-a3f1-9194ade5e62b)
@@ -126,7 +128,6 @@ To give users a hands-on experience with our scheme, we have deployed a simple s
 2. **Generate Access Key**: This feature generates an access key based on the provided attribute set and user information. After receiving the response, save the access key locally by using the save option in the upper right corner of the Postman response window. The access key is returned as a JSON file.
 3. **Encryption**: Encrypt the provided information using this feature. Once the response is received, save the encrypted data locally through the Postman response window. The encrypted data is returned as a ZIP file.
 4. **Decryption**: This feature decrypts the encrypted information. After receiving the response, save the decrypted data locally through the Postman response window. The decrypted data is returned as a JSON file.
-
 
 #### How to Save Responses Locally:
 
