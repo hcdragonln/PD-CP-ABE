@@ -10,6 +10,8 @@
 [![Formal Verification](https://img.shields.io/badge/Formal%20Verification-Tamarin-brightgreen)](https://tamarin-prover.com)
 
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://app.getpostman.com/run-collection/23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f%26entityType%3Dcollection%26workspaceId%3D1f0a1601-87f1-4963-a3f1-9194ade5e62b)
+[<img src="https://img.shields.io/badge/Postman-Documentation-orange?logo=postman" alt="Postman Docs Link">](https://documenter.getpostman.com/view/23135719/2sB2cYdLuL)
+
 
 
 Welcome to the **Partially Decryptable Ciphertext Policy Attribute-Based Encryption (CP-ABE) Scheme**! This repo implements a CP-ABE scheme that allows for partial decryption, providing fine-grained access control securely and efficiently.🔐
@@ -123,6 +125,8 @@ The above script sets up the dependencies and environment required to run charm-
 To give users a hands-on experience with our scheme, we have deployed a simple server that allows you to quickly explore the functionality of our solution. You can fork the API collection using the Postman button below. The server currently supports the following features:
 
 [<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://app.getpostman.com/run-collection/23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f?action=collection%2Ffork&source=rip_markdown&collection-url=entityId%3D23135719-b685e954-bcd1-43e5-95f0-b3038725ad3f%26entityType%3Dcollection%26workspaceId%3D1f0a1601-87f1-4963-a3f1-9194ade5e62b)
+[<img src="https://img.shields.io/badge/Postman-Documentation-orange?logo=postman" alt="Postman Docs Link">](https://documenter.getpostman.com/view/23135719/2sB2cYdLuL)
+
 
 1. **Hello Check**: This endpoint checks if the server is running properly. If everything is operational, the server will return "Hello, World!!!" as the response.
 2. **Generate Access Key**: This feature generates an access key based on the provided attribute set and user information. After receiving the response, save the access key locally by using the save option in the upper right corner of the Postman response window. The access key is returned as a JSON file.
