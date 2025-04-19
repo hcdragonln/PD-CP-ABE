@@ -38,7 +38,6 @@ RUN echo 'source /opt/py37/bin/activate' >> ~/.bashrc
 WORKDIR /root
 
 # Set the default command to run the bash shell
-CMD ["/bin/bash"]
 
 COPY . /app
 
