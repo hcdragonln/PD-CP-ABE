@@ -39,3 +39,14 @@ WORKDIR /root
 
 # Set the default command to run the bash shell
 CMD ["/bin/bash"]
+
+COPY . /app
+
+# Set working directory
+WORKDIR /app
+
+# Expose Flask default port
+EXPOSE 5000
+
+# Run the Flask server
+CMD ["/opt/py37/bin/python", "app.py"]
